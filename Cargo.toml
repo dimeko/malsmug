@@ -1,0 +1,10 @@
+[package]
+name = "mal-js-detection"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.32", features = ["derive"] }
+dockers = "=0.1.6"
+oxc = {version = "0.61.2", features = ["ast_visit", "serialize"]}
+

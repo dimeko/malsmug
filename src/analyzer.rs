@@ -1,0 +1,47 @@
+use core::fmt;
+
+
+pub enum Severity {
+    Low,
+    Moderate,
+    High,
+    VeryHigh
+}
+
+impl Clone for Severity {
+    fn clone(&self) -> Self {
+        match self {
+            Severity::Low => Severity::Low,
+            Severity::Moderate => Severity::Moderate,
+            Severity::High => Severity::High,
+            Severity::VeryHigh => Severity::VeryHigh,
+        }
+    }
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Severity::Low => write!(f, "Low"),
+            Severity::Moderate => write!(f, "Moderate"),
+            Severity::High => write!(f, "High"),
+            Severity::VeryHigh => write!(f, "Very High")
+        }
+        
+    }
+}
+pub struct Finding {
+    pub severity: Severity,
+    pub poc: String,
+}
+
+impl fmt::Display for Finding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format!("severity: {}\npoc: {}", self.severity, self.poc))
+    }
+}
+
+pub trait Analyzer<'a> {
+    fn get_findings(&self) -> &Vec<Finding>;
+    fn analyze(&mut self) -> Result<bool, String>;
+}

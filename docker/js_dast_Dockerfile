@@ -1,0 +1,14 @@
+FROM ghcr.io/puppeteer/puppeteer:latest
+
+WORKDIR /js_dast
+COPY package.json tsconfig.json ./
+COPY src ./src
+
+RUN apt-get update && apt-get install -y iptables && \
+    npm install && \
+    npm run build
+
+RUN iptables -A OUTPUT -j LOG --log-prefix "OUTGOING (BLOCKED): " && \
+    iptables -A OUTPUT -j REJECT
+
+CMD ["node", "app.ts"]

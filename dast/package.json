@@ -1,0 +1,29 @@
+{
+  "name": "dast",
+  "version": "1.0.0",
+  "description": "Mini behavioral analysis on Javascript samples",
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/app.ts"
+  },
+  "main": "./dist/app.js",
+  "bin": {
+    "pizza": "./dist/app.js"
+  },
+  "author": "dimeko",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "clear": "^0.1.0",
+    "commander": "^13.1.0",
+    "figlet": "^1.8.0",
+    "path": "^0.12.7",
+    "puppeteer": "^21.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.13",
+    "nodemon": "^3.1.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  }
+}
