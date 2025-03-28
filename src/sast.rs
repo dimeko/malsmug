@@ -7,11 +7,11 @@ use oxc::parser::{
 use oxc::span::SourceType;
 use oxc::ast_visit::{walk, Visit};
 
-use crate::analyzer::{self, Finding};
+use crate::analyzer;
 
 // creating different struct here in order to be able to create
 // multiple sources for [`analyzer::Findings`]
-struct IoC {
+struct StaticAnalysisIoC {
     severity: analyzer::Severity,
     poc: String,
     title: String,
@@ -19,7 +19,7 @@ struct IoC {
 
 struct Scanner<'a> {
     source: &'a str,
-    _interesting_items: Vec<IoC>
+    _interesting_items: Vec<StaticAnalysisIoC>
 }
 
 impl<'a> Visit<'a> for Scanner<'a> {
@@ -29,7 +29,7 @@ impl<'a> Visit<'a> for Scanner<'a> {
                 if let Expression::Identifier(_id) = &_m.object {
                      if matches!(_id.name.as_str(), "xhr" | "eval" | "Function" | "setTimeout" | "setInterval") {
                         self._interesting_items.push(
-                            IoC {
+                            StaticAnalysisIoC {
                                 severity: analyzer::Severity::Moderate,
                                 poc: _id.name.to_string(),
                                 title: _id.name.to_string()
@@ -39,10 +39,6 @@ impl<'a> Visit<'a> for Scanner<'a> {
                 }
             }
         }
-
-        // if let Expression::FunctionExpression(_f) = expr {
-        //     println!("FunctionExpression {:#?}", _f);
-        // }
     }
 }
 
@@ -56,7 +52,6 @@ impl SastAnalyzer {
     pub fn new(file_path: PathBuf) -> Self {
         let mut _f = File::open(&file_path).expect("could not open file");
 
-        
         let mut _str_from_file = String::new();
         let _string = _f.read_to_string(&mut _str_from_file).unwrap();
 
@@ -89,8 +84,8 @@ impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
     fn analyze(&mut self) -> Result<bool, String> {
         let source_type: SourceType = SourceType::from_path(Path::new(&self.file_path)).unwrap();
         let allocator = Allocator::default();
-        let binding = self.get_src_text(); // < ---------------------- be careful here
-        let _src_str = &binding.as_str(); // review this
+        let binding = self.get_src_text();
+        let _src_str = &binding.as_str();
         let js_file_ast = JSParser::new(&allocator, _src_str, source_type)
             .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
             .parse();

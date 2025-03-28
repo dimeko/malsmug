@@ -1,14 +1,41 @@
-FROM ghcr.io/puppeteer/puppeteer:latest
+FROM ghcr.io/puppeteer/puppeteer:latest AS installer
+# puppeteer:24.4.0
 
 WORKDIR /js_dast
-COPY package.json tsconfig.json ./
-COPY src ./src
+COPY dast/package.json dast/tsconfig.json ./
 
-RUN apt-get update && apt-get install -y iptables && \
-    npm install && \
-    npm run build
+RUN mkdir samples
+RUN mkdir default
+COPY dast/default_samples/default.js ./default/default.js
 
-RUN iptables -A OUTPUT -j LOG --log-prefix "OUTGOING (BLOCKED): " && \
-    iptables -A OUTPUT -j REJECT
+RUN npm install
+RUN mkdir browsers 
+RUN npx puppeteer browsers install chrome --path ./browsers
 
-CMD ["node", "app.ts"]
+FROM ghcr.io/puppeteer/puppeteer:latest AS release
+
+WORKDIR /js_dast
+COPY --from=installer /js_dast /js_dast
+
+USER root
+RUN useradd dast
+
+RUN apt install -y iptables
+
+COPY docker/js_dast_entrypoint.sh /js_dast_entrypoint.sh 
+RUN chmod +x /js_dast_entrypoint.sh 
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-khmeros \
+    fonts-kacst fonts-freefont-ttf dbus dbus-x11
+
+ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
+# ENV XDG_CONFIG_HOME=/tmp/.chromium
+# ENV XDG_CACHE_HOME=/tmp/.chromium
+
+COPY dast/src/ ./src/
+RUN npm run build
+
+# ENTRYPOINT ["ls", "-la", "browsers/chrome/linux-134.0.6998.35/chrome-linux64"]
+ENTRYPOINT ["/js_dast_entrypoint.sh"]
+CMD ["./default/default.js"]

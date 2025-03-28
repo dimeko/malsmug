@@ -18,11 +18,19 @@ if (!fs.existsSync(scriptFile)) {
     console.log("[*] Launching browser...");
     const browser = await puppeteer.launch({
         headless: true,
-        args: ["--disable-web-security", "--disable-features=IsolateOrigins,site-per-process", "--no-sandbox"]
+        dumpio: true,
+        executablePath: "/js_dast/browsers/chrome/linux-134.0.6998.35/chrome-linux64/chrome",
+        args: [
+        //     "--ignore-certificate-errors",
+        //     "--disable-setuid-sandbox",
+        //     "--disable-web-security",
+        //     "--disable-features=IsolateOrigins,site-per-process",
+        //     "--disable-gpu",
+            "--no-sandbox"]
     });
-
+    console.log("[*] Launched ...");
     const page = await browser.newPage();
-    await page.goto('https://example.com');
+    // await page.goto('https://example.com');
     console.log("[*] Hooking JavaScript APIs...");
     page
     .on('console', message =>
@@ -32,17 +40,17 @@ if (!fs.existsSync(scriptFile)) {
       console.log(`[browser] ${response.status()} ${response.url()}`))
 
     await page.evaluate(() => {
-        const originalSetItem = localStorage.setItem;
-        localStorage.setItem = function (key: string, value: string) {
-            console.log(`[Hook] localStorage.setItem(${key}, ${value})`);
-            return originalSetItem.apply(this, [key, value] as [key: string, value: string]);
-        };
+        // const originalSetItem = localStorage.setItem;
+        // localStorage.setItem = function (key: string, value: string) {
+        //     console.log(`[Hook] localStorage.setItem(${key}, ${value})`);
+        //     return originalSetItem.apply(this, [key, value] as [key: string, value: string]);
+        // };
 
-        const originalGetItem = localStorage.getItem;
-        localStorage.getItem = function (key: string) {
-            console.log(`[Hook] localStorage.getItem(${key})`);
-            return originalGetItem.apply(this, [key] as [key: string]);
-        };
+        // const originalGetItem = localStorage.getItem;
+        // localStorage.getItem = function (key: string) {
+        //     console.log(`[Hook] localStorage.getItem(${key})`);
+        //     return originalGetItem.apply(this, [key] as [key: string]);
+        // };
 
         const originalFetch = window.fetch;
         window.fetch = function (...args) {
