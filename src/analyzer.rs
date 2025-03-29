@@ -37,7 +37,7 @@ pub struct Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", format!("severity: {}\npoc: {}", self.severity, self.poc))
+        write!(f, "{}", format!("severity: {}, poc: {}", self.severity, self.poc))
     }
 }
 

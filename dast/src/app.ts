@@ -15,68 +15,94 @@ if (!fs.existsSync(scriptFile)) {
 }
 
 (async () => {
-    console.log("[*] Launching browser...");
+    console.log("[analysis-debug] Launching browser...");
     const browser = await puppeteer.launch({
         headless: true,
         dumpio: true,
         executablePath: "/js_dast/browsers/chrome/linux-134.0.6998.35/chrome-linux64/chrome",
         args: [
-        //     "--ignore-certificate-errors",
-        //     "--disable-setuid-sandbox",
-        //     "--disable-web-security",
-        //     "--disable-features=IsolateOrigins,site-per-process",
-        //     "--disable-gpu",
+            "--ignore-certificate-errors",
+            "--disable-setuid-sandbox",
+            "--disable-web-security",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-gpu",
             "--no-sandbox"]
     });
-    console.log("[*] Launched ...");
+    console.log("[analysis-debug] Launched ...");
     const page = await browser.newPage();
-    // await page.goto('https://example.com');
-    console.log("[*] Hooking JavaScript APIs...");
+    await page.goto('https://google.com');
+    console.log("[analysis-debug] Hooking JavaScript APIs...");
     page
     .on('console', message =>
-      console.log(`[browser] ${message.type().substr(0, 3).toUpperCase()} ${message.text()}`))
-    .on('pageerror', ({ message }) => console.log(`[browser] ${message}`))
-    .on('response', response =>
-      console.log(`[browser] ${response.status()} ${response.url()}`))
+      console.log(`[target-console] ${message.text()}`))
+    .on('pageerror', ({ message }) => console.log(`[target-pageerror] ${message}`))
+    .on('response', response => {
+            console.log(`[target-response] ${response.status()} ${response.url()}`)
+            response.json().then((_r) => {
+                console.log(`[target-response][success] ${_r}`)
+            }).catch((_e) => {
+                console.log(`[target-response][error] ${_e}`)
+            })
+        }
+    )
 
     await page.evaluate(() => {
-        // const originalSetItem = localStorage.setItem;
-        // localStorage.setItem = function (key: string, value: string) {
-        //     console.log(`[Hook] localStorage.setItem(${key}, ${value})`);
-        //     return originalSetItem.apply(this, [key, value] as [key: string, value: string]);
-        // };
+        const originalSetItem = window.localStorage.setItem;
+        window.localStorage.setItem = function (key: string, value: string) {
+            console.log(`[hook-debug][localStorage.setItem] localStorage.setItem(${key}, ${value})`);
+            return originalSetItem.apply(this, [key, value] as [key: string, value: string]);
+        };
 
-        // const originalGetItem = localStorage.getItem;
-        // localStorage.getItem = function (key: string) {
-        //     console.log(`[Hook] localStorage.getItem(${key})`);
-        //     return originalGetItem.apply(this, [key] as [key: string]);
-        // };
+        const originalGetItem = window.localStorage.getItem;
+        window.localStorage.getItem = function (key: string) {
+            console.log(`[hook-debug][localStorage.getItem] localStorage.getItem(${key})`);
+            return originalGetItem.apply(this, [key] as [key: string]);
+        };
 
         const originalFetch = window.fetch;
         window.fetch = function (...args) {
-            console.log(`[Hook] fetch called with`, args);
+            console.log(`[hook-debug][window.fetch] fetch called with`, args);
             return originalFetch.apply(this, args);
         };
 
         const originalXHR = window.XMLHttpRequest.prototype.open;
-        window.XMLHttpRequest.prototype.open = (method: string, url: any , async?: boolean, username?: string, password?: string) => {
-            console.log(`[Hook] XMLHttpRequest called with`, method, url, async, username, password);
-            return originalXHR.apply(this, [
-                method, url, async, username, password] as [
-                    method: string,
-                    url: string | URL,
-                    async: boolean,
-                    username?: string | null | undefined,
-                    password?: string | null | undefined]);
+        window.XMLHttpRequest.prototype.open = function(...args: any) {
+            console.log(`[hook-debug][window.XMLHttpRequest.prototype.open] XMLHttpRequest called with`, ...args);
+            return originalXHR.apply(this, args);
         };
+
+        let originalCookies = document.cookie;
+        Object.defineProperty(document, "cookie", {
+            get: function () {
+                console.log("[hook-debug][document.cookie][get]");
+                return originalCookies;
+            },
+            set: function (value) {
+                console.log(`[hook-debug][document.cookie][set]:${value}`);
+                originalCookies += value + "; "; 
+            }
+        });
+
+        const originalWindow: Window = window;
+
+        window = new Proxy(originalWindow, {
+            get(target: Window, prop: string, receiver) {
+                console.log(`[hook-debug][window][get] ${prop}`);
+                return Reflect.get(target, prop, receiver);
+            },
+            set(target: Window, prop: string, value: any, receiver) {
+                console.log(`[hook-debug][window][set] ${prop}->${value}`);
+                return Reflect.set(target, prop, value, receiver);
+            }
+        }) as Window & typeof globalThis;
     });
 
-    console.log(`[*] Executing script: ${scriptFile}`);
+    console.log(`[analysis-debug] Executing script: ${scriptFile}`);
     
     const scriptCode = fs.readFileSync(scriptFile, "utf-8");
     // console.log("code: ", scriptCode);
     await page.evaluate(scriptCode);
 
-    console.log("[*] Closing browser...");
+    console.log("[analysis-debug] Closing browser...");
     await browser.close();
 })();

@@ -1,6 +1,6 @@
 use oxc::ast::ast::Program;
 use std::{fs::File, io::Read, path::{Path, PathBuf}};
-use oxc::{allocator::Allocator, ast::ast::{Expression, Function, match_member_expression}};
+use oxc::{allocator::Allocator, ast::ast::Expression};
 use oxc::parser::{
     Parser as JSParser, ParseOptions
 };
@@ -24,6 +24,7 @@ struct Scanner<'a> {
 
 impl<'a> Visit<'a> for Scanner<'a> {
     fn visit_expression(&mut self, expr: &Expression) {
+        println!("{:#?}", expr);
         if let Expression::CallExpression(_f) = expr {
             if let Expression::StaticMemberExpression(_m) = &_f.callee {
                 if let Expression::Identifier(_id) = &_m.object {
@@ -38,7 +39,9 @@ impl<'a> Visit<'a> for Scanner<'a> {
                     }
                 }
             }
-        }
+        } //else if   {
+            
+        // } 
     }
 }
 

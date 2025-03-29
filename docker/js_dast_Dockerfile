@@ -19,9 +19,6 @@ COPY --from=installer /js_dast /js_dast
 
 USER root
 RUN useradd dast
-
-RUN apt install -y iptables
-
 COPY docker/js_dast_entrypoint.sh /js_dast_entrypoint.sh 
 RUN chmod +x /js_dast_entrypoint.sh 
 
@@ -36,6 +33,5 @@ ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 COPY dast/src/ ./src/
 RUN npm run build
 
-# ENTRYPOINT ["ls", "-la", "browsers/chrome/linux-134.0.6998.35/chrome-linux64"]
 ENTRYPOINT ["/js_dast_entrypoint.sh"]
 CMD ["./default/default.js"]
