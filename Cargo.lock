@@ -1095,7 +1095,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mal-js-detection"
+name = "malsmug"
 version = "0.1.0"
 dependencies = [
  "async-std",
