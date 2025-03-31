@@ -23,30 +23,27 @@ Run:
 
 #### static analysis ioc(s)
 
-- eval (ast)
-- execScript (ast)
-- http://urls (regex)
-- `<script></script>` in string (regex or ast)
+- expression including eval (ast)
+- expression including execScript (ast)
+- call of `document.write` with potential html elements as arguments (regex or ast)
 
-todo:
-- document.write and element is script/link/iframe/object/embed or img/audio/video/source/track
-- withCredentials directive in xhr
-
-Identifiers from `ocx` Abstract Syntax Tree:
+Some identifiers from `ocx` Abstract Syntax Tree:
 - StaticMemberExpression function calls: CallExpression -> callee:StaticMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
 - ComputedMemberExpression function calls:  CallExpression -> callee:ComputedMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
 
 #### dynamic analysis ioc(s)
-All ioc(s) are detected using hooks:
 
-- request on black listed ip
-- cookie.get
-- cookie.set
-- localStorage.getItems
-- localStorage.setItems
+- call of `cookie.get`
+- call of `cookie.set`
+- call of `localStorage.getItems`
+- call of `localStorage.setItems`
+- call of `document.write`
+- call of `window.eval`
+- call of `window.execScript`
+- call of `document.addEventListener`
 - creation of new html elements that can trigger network calls
-- form input data sent with HTTP request
-- call to `document.eval` and `document.execScript`
+- low domain reputation score
+- suspicious form input data sent with HTTP request
 
 #### todo
 - add more keys to known KNOWN_SENSITIVE_DATA_KEYS (eg ASP.NET cookie)
