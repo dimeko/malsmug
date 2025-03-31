@@ -1,4 +1,5 @@
 use serde::{Serialize, Deserialize};
+use core::fmt;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -9,7 +10,23 @@ pub enum EventType {
     NewHtmlElement,
     SetCookie,
     GetCookie,
-    ConsoleLog
+    ConsoleLog,
+    AddEventListener
+}
+
+impl fmt::Display for EventType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        match self {
+            EventType::HttpRequest => write!(f, "http_request"),
+            EventType::HttpResponse => write!(f, "http_response"),
+            EventType::FunctionCall => write!(f, "function_call"),
+            EventType::NewHtmlElement => write!(f, "new_html_element"),
+            EventType::SetCookie => write!(f, "set_cookie"),
+            EventType::GetCookie => write!(f, "get_cookie"),
+            EventType::ConsoleLog => write!(f, "console_log"),
+            EventType::AddEventListener => write!(f, "add_event_listenet"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -54,6 +71,11 @@ pub struct EventGetCookie {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct EventAddEventListener {
+    pub listener: String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum EventValue {
     EventHttpRequest(EventHttpRequest),
@@ -62,7 +84,8 @@ pub enum EventValue {
     EventNewHtmlElement(EventNewHtmlElement),
     EventSetCookie(EventSetCookie),
     EventGetCookie(EventGetCookie),
-    EventConsoleLog(EventConsoleLog)
+    EventConsoleLog(EventConsoleLog),
+    EventAddEventListener(EventAddEventListener)
 }
 
 #[derive(Serialize, Deserialize, Debug)]

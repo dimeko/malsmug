@@ -10,7 +10,7 @@ class Lure {
     private async _forms_lure() {
         const inputs = await this.page.$$("input");
         for (const _i in inputs) {
-            await inputs[_i].type(`fake_input_${_i}`)
+            await inputs[_i].type(`fake_input_from_sandbox_${_i}`)
         }
     
         const forms = await this.page.$$("form");

@@ -4,15 +4,18 @@ use std::fs::File;
 use std::process::Command;
 use serde::Deserialize;
 use serde_json::Value;
-use log::{error, warn};
+use log::{error, warn, debug, info};
 use std::collections::HashMap;
-use futures::{future, Future};
-use futures::executor::block_on;
+use async_std::task::block_on;
+use url::Url;
+use publicsuffix::{Psl, List};
+use std::str;
 
 use crate::analyzer;
 use crate::dast_event_types;
+use crate::utils;
 
-const KNOWN_SENSITIVE_COOKIE_NAMES: [&str; 5] = [
+const KNOWN_SENSITIVE_DATA_KEYS: [&str; 5] = [
     "ASPSESSIONID",
     "PHPSESSID",
     "JSESSIONID",
@@ -20,13 +23,33 @@ const KNOWN_SENSITIVE_COOKIE_NAMES: [&str; 5] = [
     "connect.sid"
 ];
 
+const DEFAULT_DOMAIN_REPUTATION: f32 = 15.0;
 
+const KNOWN_NETWORK_DOM_ELEMENTS: [&str; 11] = [
+    "form",
+    "img",
+    "audio",
+    "source",
+    "video",
+    "track",
+    "script",
+    "link",
+    "iframe",
+    "object",
+    "embed"
+];
+
+// DynamicAnalysisIoC is supposed to be used in multiple different scanners
+// Currently, in our simple implementation, we use analyzer::Finding without
+// converting from DynamicAnalysisIoC
+#[allow(dead_code)]
 struct DynamicAnalysisIoC {
     severity: analyzer::Severity,
     poc: String,
     title: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct SpamHausResponse {
     domain: String,
@@ -35,7 +58,7 @@ struct SpamHausResponse {
     tags: Vec<String>,
     abused: bool,
     whois: Value,          // Generic JSON for whois
-    score: i32,
+    score: f32,
     dimensions: Value,     // Generic JSON for dimensions
 }
 
@@ -44,38 +67,114 @@ pub struct DastAnalyzer {
     test_url_to_visit: String,
     findings: Vec<analyzer::Finding>,
     log_sandbox_out: bool,
-    cached_domain_reputations: HashMap<String, i32>,
-    _interesting_items: Vec<DynamicAnalysisIoC>
+    cached_domain_reputations: HashMap<String, f32>,
+    _interesting_findings: Vec<DynamicAnalysisIoC>
 }
 
 impl DastAnalyzer {
     pub fn new(file_path: PathBuf, url_to_visit: String, log_sandbox_out: bool) -> Self {
-        let mut _f = File::open(&file_path).expect("could not open file");
+        let mut _f = match File::open(&file_path) {
+            Ok(_f) => _f,
+            Err(_e) => {
+                error!("error opening {}: {}", file_path.to_string_lossy(), _e);
+                std::process::exit(1)
+            }
+        };
         DastAnalyzer { 
             file_path,
             findings: Vec::new(),
             test_url_to_visit: url_to_visit,
             log_sandbox_out,
             cached_domain_reputations: HashMap::new(),
-            _interesting_items: Vec::new()
+            _interesting_findings: Vec::new()
         }
     }
 
+    // normalize url to make parsing easier
+    fn _normalize_url(&self, url: &str) -> String {
+        let mut url_normalized: String = url.to_string();
+
+        if url.starts_with("//") {
+            url_normalized = format!("https:{}", url);
+        }
+        return url_normalized;
+    }
+
     // fetches given domain reputation score from spamhaus.com
-    async  fn _get_domain_reputation(&self, url: &str) -> impl Future<Item = i32, Error = ()> {
-        let response = reqwest::get(url).await;
+    async fn _get_domain_reputation(&self, url: &str) -> f32 {
+        let  url_normalized: String = self._normalize_url(url);
+
+        info!("_get_domain_reputation url: {}", url_normalized);
+        let domain = match Url::parse(&url_normalized) {
+            Ok(_u) => {
+                _u
+            },
+            Err(_e) => {
+                error!("could not parse url: {}", _e);
+                return -1.0;
+            }
+        };
+        let mut public_suffixes = match File::open("./public_suffix.txt") {
+            Ok(_f) => _f,
+            Err(_e) => {
+                error!("{}", _e);
+                return -1.0;
+            }
+        };
+        let mut buf: String = String::new();
+        let _ = public_suffixes.read_to_string(&mut buf);
+        let list: List = match buf.parse() {
+            Ok(_l) => _l,
+            Err(_e) => {
+                error!("could not open public suffix file");
+                return -1.0;
+            }
+        };
+        let domain = match list.domain(domain.host_str().unwrap_or("").as_bytes()) {
+            Some(_d) => _d,
+            None => {
+                error!("could not parse domain: {}", &url_normalized);
+                return -1.0;
+            }
+        };
+
+        let domain_string = match str::from_utf8(domain.as_bytes()) {
+            Ok(_s) => _s,
+            Err(_e) => {
+                error!("could not parse domain: {}", &url_normalized);
+                return -1.0;
+            }
+        };
+        debug!("checking domain: {}", domain_string);
+        let spamhaus_url = format!("https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/{}/overview", domain_string);
+        debug!("{}", spamhaus_url);
+        let _client = reqwest::blocking::Client::new();
+        let response = _client.get(spamhaus_url)
+                .header("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0")
+                .send();
+
         match response {
             Ok(_resp) => {
-                let _resp_body = _resp.text().await.unwrap();
-                let _domain_rep_resp = serde_json::from_str::<SpamHausResponse>(&_resp_body).unwrap();
-                println!("{:?}", _domain_rep_resp);
-                future::ok(_domain_rep_resp.score)
+                let _resp_body = &_resp.text().unwrap_or("{}".to_string());
+                debug!("response for {}: {}", domain_string, _resp_body);
+                let _domain_resp = match serde_json::from_str::<SpamHausResponse>(&_resp_body) {
+                    Ok(_r) => {
+                        _r
+                    },
+                    Err(_e) => {
+                        warn!("could not determine domain reputation, putting default value: {}", DEFAULT_DOMAIN_REPUTATION);
+                        return DEFAULT_DOMAIN_REPUTATION; // return a value for domains that are not found
+                    }
+                };
+                debug!("{:?}", _domain_resp);
+                debug!("reputation score: {}", _domain_resp.score);
+                return _domain_resp.score
             },
             Err(_err) => {
-                future::err(format!("error fetching domain reputation: {}", _err))
+                error!("error fetching domain reputation: {}", _err);
+                return -1.0;
             }
         }
-        future::ok(-1)
     }
 }
 
@@ -87,7 +186,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         let mut file_volume: String = "".to_owned();
         file_volume.push_str("./");
         file_volume.push_str(self.file_path.to_str().unwrap());
-        file_volume.push_str(":/js_dast/samples/file.js");
+        file_volume.push_str(":/js_sandbox/samples/file.js");
 
         // spinning up sandbox
         _docker_analyze_cmd.args(
@@ -98,11 +197,10 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                 &file_volume.to_ascii_lowercase(),
                 "--cap-add=NET_ADMIN",
                 "js-dast",
-                "/js_dast/samples/file.js",
+                "/js_sandbox/samples/file.js",
                 &self.test_url_to_visit
             ]
         );
-
 
         let output = _docker_analyze_cmd.output().expect("docker command failed");
         let lines_stderr = output.stderr
@@ -111,10 +209,11 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
             .unwrap_or(line));
         // log sandbox output
         if self.log_sandbox_out {
+            debug!("Sandbox output:");
             for mut _l in lines_stderr.clone() {
                 let mut buf = String::new();
                 let _ = _l.read_to_string(&mut buf);
-                println!("{}", buf);
+                println!("  {}", buf);
             }
         }
 
@@ -128,7 +227,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
             for mut _l in lines_stdout.clone() {
                 let mut buf = String::new();
                 let _ = _l.read_to_string(&mut buf);
-                println!("{}", buf);
+                println!("  {}", buf);
             }
         }
 
@@ -143,9 +242,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
             let mut buf = String::new();
             let _ = _l.read_to_string(&mut buf);
             if let Some(pos) = buf.find("[event]:") {
-                let json_part = &buf[pos + 8..]; // Extract substring after ":"
-                println!("{}", json_part);
-                
+                let json_part = &buf[pos + 8..]; // Extract substring after ":"                
                 let event: dast_event_types::Event = match serde_json::from_str(json_part) {
                     Ok(_d) => _d,
                     Err(_e) => {
@@ -156,43 +253,125 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
 
                 match event.value {
                     dast_event_types::EventValue::EventHttpRequest(_v) => {
+                        // analysis: check response url domain reputation
                         if self.cached_domain_reputations.get(&_v.url) == None {
                             let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
                             self.cached_domain_reputations.insert(
                                 _v.url.clone(),
                                 _score
-                                ).unwrap();
+                                ).map(|_e| {
+                                    error!("err: {}, could not get reputation score: {}",_e, _v.url);
+                                    return -1;
+                                });
                         }
                         
-                        if self.cached_domain_reputations[&_v.url] <= 20 {
-                            self._interesting_items.push(
-                                DynamicAnalysisIoC { 
+                        if self.cached_domain_reputations[&_v.url] <= 20.0 && self.cached_domain_reputations[&_v.url] > 0.0 {
+                            self.findings.push(
+                                analyzer::Finding { 
                                     severity: analyzer::Severity::High,
-                                    poc: _v.url,
+                                    poc: _v.url.clone(),
                                     title: "bad reputation url called".to_string()
                                 });
+                        }
+
+                        // analysis: check for user input sent in request
+                        if _v.data.contains("fake_input_from_sandbox_") { // "fake_input_from_sandbox_" is the default input prefix that the sandbox puts inside the input fields 
+                        self.findings.push(
+                            analyzer::Finding { 
+                                severity: analyzer::Severity::VeryHigh,
+                                poc: _v.data,
+                                title: "http request sent containing user input data".to_string()
+                            });
                         }
                     },
                     dast_event_types::EventValue::EventHttpResponse(_v) => {
+                        // analysis: check response url domain reputation
                         if self.cached_domain_reputations.get(&_v.url) == None {
                             let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
                             self.cached_domain_reputations.insert(
                                 _v.url.clone(),
                                 _score
-                                ).unwrap();
+                                ).map(|_e| {
+                                    error!("err: {}, could not get reputation score: {}",_e, _v.url);
+                                    return -1;
+                                });
                         }
-                        
-                        if self.cached_domain_reputations[&_v.url] <= 20 {
-                            self._interesting_items.push(
-                                DynamicAnalysisIoC { 
+                        if self.cached_domain_reputations[&_v.url] <= 20.0 && self.cached_domain_reputations[&_v.url] > 0.0 {
+                            self.findings.push(
+                                analyzer::Finding { 
                                     severity: analyzer::Severity::High,
                                     poc: _v.url,
                                     title: "bad reputation url called".to_string()
                                 });
                         }
                     },
+                    dast_event_types::EventValue::EventNewHtmlElement(_v) => {
+                        // analysis: check if the target creates new html elements that can potentially access the internet
+                        if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
+                            self.findings.push(
+                                analyzer::Finding { 
+                                    severity: analyzer::Severity::VeryHigh,
+                                    poc: _v.element_type,
+                                    title: "dangerous html element created".to_string()
+                                });
+                        }
+                    },
+                    dast_event_types::EventValue::EventFunctionCall(_v) => {
+                        // analysis: check document.write call with the first argument being an html-like element
+                        if matches!(_v.callee.as_str(), "document.write") && _v.arguments.len() > 0 {
+                            if utils::contains_html_like_code(_v.arguments[0].as_str()) {
+                                self.findings.push(
+                                    analyzer::Finding { 
+                                        severity: analyzer::Severity::VeryHigh,
+                                        poc: _v.callee,
+                                        title: "document.write was called with html element as parameter".to_string()
+                                    });
+                            }
+                        } else if matches!(_v.callee.as_str(), "window.eval") {
+                            // analysis: check window.eval call
+                            // here we could also check whether the eval paramater is actually a malicious Javascript code
+                            // for now we check just the dangerous call to `.eval`
+                            self.findings.push(
+                                analyzer::Finding { 
+                                    severity: analyzer::Severity::VeryHigh,
+                                    poc: _v.callee,
+                                    title: "window.eval was called".to_string()
+                                });
+                        } else if matches!(_v.callee.as_str(), "window.execScript") {
+                            // analysis: check window.execScript call
+                            self.findings.push(
+                                analyzer::Finding { 
+                                    severity: analyzer::Severity::VeryHigh,
+                                    poc: _v.callee,
+                                    title: "window.execScript was called".to_string()
+                                });
+                        } else if matches!(_v.callee.as_str(), "window.localStorage.getItem")  && _v.arguments.len() > 0 {
+                            // analysis: check whether the target tries to access sinsitive data keys
+                            if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.arguments[0].as_str()) {
+                                self.findings.push(
+                                    analyzer::Finding { 
+                                        severity: analyzer::Severity::VeryHigh,
+                                        poc: format!("{}({})", _v.callee, &_v.arguments[0].as_str()),
+                                        title: "window.localStorage tried to access sensitive information".to_string()
+                                    });
+                            }
+                        }
+                    },
+                    dast_event_types::EventValue::EventGetCookie(_v) => {
+                        if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.cookie.as_str()) {
+                            self.findings.push(
+                                analyzer::Finding { 
+                                    severity: analyzer::Severity::VeryHigh,
+                                    poc: "document.cookie".to_string(),
+                                    title: "document.cookie tried to access sensitive data key".to_string()
+                                });
+                        }
+                    },
+                    dast_event_types::EventValue::EventAddEventListener(_v) => {
+                        debug!("added event_listener: {}", _v.listener);
+                    }
                     _ => {
-                        warn!("event was not handled")
+                        warn!("event of type {} was not handled", event.event_type)
                     }
                 };
             }

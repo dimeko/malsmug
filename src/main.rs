@@ -2,11 +2,13 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use log::info;
 use env_logger::Builder;
+use colored::Colorize;
 
 mod analyzer;
 mod sast;
 mod dast;
 mod dast_event_types;
+mod utils;
 
 use analyzer::Analyzer;
 
@@ -23,7 +25,14 @@ struct Args {
         default_missing_value("true"),
         default_value("false"),
     )]
-    verbose: bool
+    verbose: bool,
+    #[clap(
+        long,
+        short,
+        default_missing_value("true"),
+        default_value("false"),
+    )]
+    debug: bool
 }
 
 #[derive(Subcommand, Debug)]
@@ -47,7 +56,7 @@ fn run_sast(file_path: PathBuf) {
         let _findings = sast.get_findings();
         info!("static analysis findings");
         for _f in _findings.iter() {
-            println!("  {}", _f);
+            println!("{}: {}", "sast finding".red(), _f);
         }
         Ok(true)
     }).unwrap();
@@ -60,7 +69,7 @@ fn run_dast(file_path: PathBuf, url_to_visit: String, log_sandbox_out: bool) {
         let _findings = dast.get_findings();
         info!("dynamic analysis findings");
         for _f in _findings.iter() {
-            println!("  {}", _f);
+            println!("{}: {}", "dast finding".red(), _f);
         }
         Ok(true)
     }).unwrap();
@@ -72,8 +81,12 @@ fn main() {
     let mut log_level: log::LevelFilter = log::LevelFilter::Warn;
     let cli_args = Args::parse();
 
-    if cli_args.verbose == true {
+    if cli_args.verbose {
         log_level = log::LevelFilter::Info;
+    }
+
+    if cli_args.debug {
+        log_level = log::LevelFilter::Debug;
     }
 
     builder
@@ -83,14 +96,14 @@ fn main() {
     info!("analyzing file: {}", &cli_args.file_path.to_str().unwrap());
     match cli_args.command {
         CliCommand::Dast { url_to_visit } => {
-            run_dast(cli_args.file_path, url_to_visit, cli_args.verbose);
+            run_dast(cli_args.file_path, url_to_visit, cli_args.debug);
         },
         CliCommand::Sast {} => {
             run_sast(cli_args.file_path);
         },
         CliCommand::All { url_to_visit } => {
             run_sast(cli_args.file_path.clone());
-            run_dast(cli_args.file_path, url_to_visit, cli_args.verbose);
+            run_dast(cli_args.file_path, url_to_visit, cli_args.debug);
         }
     }
 }

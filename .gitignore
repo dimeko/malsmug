@@ -1,4 +1,5 @@
 /target
-/dast/node_modules
+/sandbox/node_modules
 /test_docker/
 /whatever/
+./findings.md

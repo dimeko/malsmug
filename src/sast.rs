@@ -1,18 +1,16 @@
 use std::{fs::File, io::Read, path::{Path, PathBuf}};
-use clap::Arg;
-use regex::Regex;
+use log::error;
 
-use oxc::{ast::ast::{Argument, ComputedMemberExpression, Expression, PrivateFieldExpression, Program}, ast_visit::walk::{walk_binary_expression, walk_call_expression}};
+use oxc::{ast::ast::{Argument, Expression, Program}, ast_visit::walk::walk_call_expression};
 use oxc::{allocator::Allocator, ast::ast::CallExpression, ast::ast::BinaryExpression};
 use oxc::parser::{
     Parser as JSParser, ParseOptions
 };
-use oxc::allocator::Box;
 use oxc::span::SourceType;
 use oxc::ast_visit::{walk, Visit};
 
 use crate::analyzer;
-
+use crate::utils;
 // creating different struct here in order to be able to create
 // multiple sources for [`analyzer::Findings`]
 struct StaticAnalysisIoC {
@@ -27,6 +25,7 @@ enum BinaryExpressionMemberType {
     Unresolved
 }
 
+#[allow(dead_code)]
 struct BinaryExpressionMember {
     value: String,
     expression_type: BinaryExpressionMemberType
@@ -86,11 +85,7 @@ fn binary_expression_resolver(expr: &BinaryExpression) -> Vec<BinaryExpressionMe
     return _binary_members;
 }
 
-fn contains_html_like_code(input: &str) -> bool {
-    let html_regex = Regex::new(r"<\s*!?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>|</\s*[a-zA-Z][a-zA-Z0-9]*\s*>").unwrap();
-    html_regex.is_match(input)
-}
-
+#[allow(dead_code)]
 struct Scanner<'a> {
     source: &'a str,
     _interesting_items: Vec<StaticAnalysisIoC>
@@ -102,7 +97,7 @@ impl<'a> Visit<'a> for Scanner<'a> {
             if matches!(_c.property.name.as_str(), "eval" | "execScript") {
                 self._interesting_items.push(
                     StaticAnalysisIoC {
-                        severity: analyzer::Severity::VeryHigh,
+                        severity: analyzer::Severity::High,
                         poc: _c.property.name.to_string(),
                         title: "execution of known suspicious commands"
                 })
@@ -122,10 +117,10 @@ impl<'a> Visit<'a> for Scanner<'a> {
                             resolved_binary_expression.push_str(&_strlit.value);
                         }
 
-                        if contains_html_like_code(resolved_binary_expression.as_str()){
+                        if utils::contains_html_like_code(resolved_binary_expression.as_str()){
                             self._interesting_items.push(
                                 StaticAnalysisIoC {
-                                    severity: analyzer::Severity::VeryHigh,
+                                    severity: analyzer::Severity::Moderate,
                                     poc: resolved_binary_expression,
                                     title: "html element adhoc write to dom"
                             });
@@ -137,17 +132,6 @@ impl<'a> Visit<'a> for Scanner<'a> {
         // continue walking in case we want to hook for visitors
         walk_call_expression(self, it);
     }
-
-    // check all resolved string of the script (it does not work very well as it resolves many duplicates)
-    // fn visit_binary_expression(&mut self, it: &BinaryExpression<'a>) {
-    //     let binary_expression_members: Vec<BinaryExpressionMember> = binary_expression_resolver(it);
-    //     for _be in binary_expression_members.iter() {
-    //         print!("{}", _be.value)
-    //     }
-    //     println!();
-    //     walk_binary_expression(self, it);
-    // }
-
 }
 
 pub struct SastAnalyzer {
@@ -158,7 +142,13 @@ pub struct SastAnalyzer {
 
 impl SastAnalyzer {
     pub fn new(file_path: PathBuf) -> Self {
-        let mut _f = File::open(&file_path).expect("could not open file");
+        let mut _f = match File::open(&file_path) {
+            Ok(_f) => _f,
+            Err(_e) => {
+                error!("error opening {}: {}", file_path.to_string_lossy(), _e);
+                std::process::exit(1)
+            }
+        };
 
         let mut _str_from_file = String::new();
         let _string = _f.read_to_string(&mut _str_from_file).unwrap();
@@ -170,18 +160,11 @@ impl SastAnalyzer {
         }
     }
 
-    fn _scan_ast(&mut self, ast: Program) {
+    fn _scan_ast(&mut self, ast: Program) -> Vec<StaticAnalysisIoC> {
 
         let mut scanner = Scanner { source: &self.source_text, _interesting_items: Vec::new() };
         walk::walk_program::<Scanner>(&mut scanner, &ast);
-
-        self.findings = scanner._interesting_items.iter().map(|_it| {
-            return analyzer::Finding {
-                poc: _it.poc.clone(),
-                severity: _it.severity.clone(),
-                title: _it.title.to_string()
-            }
-        }).collect();
+        return scanner._interesting_items
     }
 
     fn get_src_text(&self) -> String {
@@ -190,7 +173,7 @@ impl SastAnalyzer {
 }
 
 impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
-    async fn analyze(&mut self) -> Result<bool, String> {
+    fn analyze(&mut self) -> Result<bool, String> {
         // analysis parameters preparation
         let source_type: SourceType = SourceType::from_path(Path::new(&self.file_path)).unwrap();
         let allocator = Allocator::default();
@@ -203,7 +186,14 @@ impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
         // static analysis steps
 
         // analyse the Abstract Syntax Tree (for now)
-        self._scan_ast(js_file_ast.program);
+        let _interesting_findings = &mut self._scan_ast(js_file_ast.program).iter().map(|_it| {
+            return analyzer::Finding {
+                poc: _it.poc.clone(),
+                severity: _it.severity.clone(),
+                title: _it.title.to_string()
+            }
+        }).collect();
+        self.findings.append(_interesting_findings);
         // ...
         // end of analysis
         // ---------------------------------------------------

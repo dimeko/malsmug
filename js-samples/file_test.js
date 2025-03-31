@@ -32,7 +32,19 @@ function addElementsSequentially() {
 
 addElementsSequentially();
 
-// Testing cookies
+// test cookies
 document.cookie = "important_cookie=sessionId; expires=Thu, 18 Dec 2013 12:00:00 UTC; path=/; HttpOnly";
-// testing cookie access
+// test cookie access
 document.cookie["important_cookie"]
+
+// test sensitive cookie access
+document.cookie["ASPSESSIONID"]
+
+// test calls to dangerous methods
+document.write("<img src='/test_img.png' >")
+window.eval("let dangerous_declaration;")
+
+// test localStorage
+window.localStorage.getItem("a_random_key")
+// test get sensitive cookie from localStorage
+window.localStorage.getItem("ASPSESSIONID")

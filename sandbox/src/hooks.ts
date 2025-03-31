@@ -5,7 +5,8 @@ const enum EventType {
     NewHtmlElement = "new_html_element",
     SetCookie = "set_cookie",
     GetCookie = "get_cookie",
-    ConsoleLog = "console_log"
+    ConsoleLog = "console_log",
+    AddEventListener = "add_event_listener"
 }
 
 type EventHttpRequest = {
@@ -41,9 +42,21 @@ type EventGetCookie = {
     cookie: string
 }
 
+type EventAddEventListener = {
+    listener: string
+}
+
+
 type Event = {
     type: EventType,
-    value: EventHttpRequest | EventFunctionCall | EventNewHtmlElement | EventSetCookie | EventGetCookie | EventHttpResponse | EventConsoleLog,
+    value: EventHttpRequest | 
+        EventFunctionCall | 
+        EventNewHtmlElement | 
+        EventSetCookie | 
+        EventGetCookie | 
+        EventHttpResponse | 
+        EventConsoleLog | 
+        EventAddEventListener,
 }
 
 function place_hooks() {
@@ -52,7 +65,7 @@ function place_hooks() {
         let _event: Event = {
             type: EventType.FunctionCall,
             value: {
-                callee: "localStorage.setItem",
+                callee: "window.localStorage.setItem",
                 arguments: [key, value]
             } as EventFunctionCall
         }
@@ -65,13 +78,57 @@ function place_hooks() {
         let _event: Event = {
             type: EventType.FunctionCall,
             value: {
-                callee: "localStorage.getItem",
+                callee: "window.localStorage.getItem",
                 arguments: [key]
             } as EventFunctionCall
         }
         console.log(`[event]:${JSON.stringify(_event)}`);
         return originalGetItem.apply(this, [key] as [key: string]);
     };
+
+    const originalDocumentWrite = document.write;
+    document.write = function (code: string) {
+        let _event: Event = {
+            type: EventType.FunctionCall,
+            value: {
+                callee: "document.write",
+                arguments: [code]
+            } as EventFunctionCall
+        }
+        console.log(`[event]:${JSON.stringify(_event)}`);
+        return originalDocumentWrite.apply(this, [code] as [code: string]);
+    };
+
+    const originalEval = window.eval;
+    window.eval = function (code: string) {
+        let _event: Event = {
+            type: EventType.FunctionCall,
+            value: {
+                callee: "window.eval",
+                arguments: [code]
+            } as EventFunctionCall
+        }
+        console.log(`[event]:${JSON.stringify(_event)}`);
+        return originalEval.apply(this, [code] as [code: string]);
+    };
+
+    // detect Internet Explorer
+    if((window as any).execScript && 
+        navigator.userAgent.indexOf("MSIE ") > -1 || 
+        navigator.userAgent.indexOf("Trident/") > -1) {
+        const originalExecScript = (window as any).execScript;
+        window.eval = function (code: string) {
+            let _event: Event = {
+                type: EventType.FunctionCall,
+                value: {
+                    callee: "window.execScript",
+                    arguments: [code]
+                } as EventFunctionCall
+            }
+            console.log(`[event]:${JSON.stringify(_event)}`);
+            return originalExecScript.apply(this, [code] as [code: string]);
+        };
+    }
 
     const originalFetch = window.fetch;
     window.fetch = function (...args) {
@@ -141,6 +198,18 @@ function place_hooks() {
         }
     });
 
+    let originalAddEventListener = document.addEventListener
+    document.addEventListener = function(listener: string, fn: any) {
+        let _event: Event = {
+            type: EventType.AddEventListener,
+            value: {
+                listener: listener
+            } as EventAddEventListener
+        }
+        console.log(`[event]:${JSON.stringify(_event)}`);
+        return originalAddEventListener.apply(this, [listener, fn] as [listener: string, fn: any]);
+    };
+
     const observer = new MutationObserver((mutationList) => {
         for (const mutation of mutationList) {
             mutation.addedNodes.forEach((node: Node) => {
@@ -155,8 +224,7 @@ function place_hooks() {
         }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
-
+    observer.observe(document, { childList: true, subtree: true });
 }
 
 export {

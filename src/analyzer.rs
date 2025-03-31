@@ -1,6 +1,6 @@
 use core::fmt;
 
-
+#[allow(dead_code)]
 pub enum Severity {
     Low,
     Moderate,
@@ -44,5 +44,5 @@ impl fmt::Display for Finding {
 
 pub trait Analyzer<'a> {
     fn get_findings(&self) -> &Vec<Finding>;
-    async fn analyze(&mut self) -> Result<bool, String>;
+    fn analyze(&mut self) -> Result<bool, String>;
 }

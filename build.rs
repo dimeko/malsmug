@@ -1,7 +1,6 @@
 use std::process::Command;
 
 fn main() {
-    // docker  build . -t js-dast -f docker/js_dast_Dockerfile --no-cache
     let _d = Command::new("docker")
         .args([
             "build",
@@ -9,7 +8,7 @@ fn main() {
             "-t",
             "js-dast",
             "-f",
-            "./docker/js_dast_Dockerfile"
+            "./docker/js_sandbox_Dockerfile"
         ])
         .status();
     match _d {
@@ -24,5 +23,4 @@ fn main() {
             panic!("error running docker: {}", e);
         }
     }
-
 }

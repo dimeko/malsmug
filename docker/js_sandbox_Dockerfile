@@ -1,12 +1,12 @@
 FROM ghcr.io/puppeteer/puppeteer:latest AS installer
 # puppeteer:24.4.0
 
-WORKDIR /js_dast
-COPY dast/package.json dast/tsconfig.json ./
+WORKDIR /js_sandbox
+COPY sandbox/package.json sandbox/tsconfig.json ./
 
 RUN mkdir samples
 RUN mkdir default
-COPY dast/default_samples/default.js ./default/default.js
+COPY sandbox/default_samples/default.js ./default/default.js
 
 RUN npm install
 RUN mkdir browsers 
@@ -14,12 +14,12 @@ RUN npx puppeteer browsers install chrome --path ./browsers
 
 FROM ghcr.io/puppeteer/puppeteer:latest AS release
 
-WORKDIR /js_dast
-COPY --from=installer /js_dast /js_dast
+WORKDIR /js_sandbox
+COPY --from=installer /js_sandbox /js_sandbox
 
 USER root
-COPY docker/js_dast_entrypoint.sh /js_dast_entrypoint.sh 
-RUN chmod +x /js_dast_entrypoint.sh 
+COPY docker/js_sandbox_entrypoint.sh /js_sandbox_entrypoint.sh 
+RUN chmod +x /js_sandbox_entrypoint.sh 
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-khmeros \
@@ -29,8 +29,8 @@ ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 # ENV XDG_CONFIG_HOME=/tmp/.chromium
 # ENV XDG_CACHE_HOME=/tmp/.chromium
 
-COPY dast/src/ ./src/
+COPY sandbox/src/ ./src/
 RUN npm run build
 
-ENTRYPOINT ["/js_dast_entrypoint.sh"]
+ENTRYPOINT ["/js_sandbox_entrypoint.sh"]
 CMD ["./default/default.js"]

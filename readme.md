@@ -1,38 +1,49 @@
 #### mal-js-detector
 
-Build puppeteer image:
+Build everything:
 ```bash
-docker  build . -t js-dast -f docker/js_dast_Dockerfile
+cargo build
 ```
 
-Run docker:
+Run:
 ```bash
-docker run --rm --network=none -v $(pwd)/js-samples/file4.js:/js_dast/samples/file.js --cap-add=NET_ADMIN js-dast /js_dast/samples/file.js
+# debug and verbose information
+# execute script on www.facebook.com
+./target/debug/mal-js-detection -v -d --file-path js-samples/file_test.js all --url-to-visit https://www.facebook.com
+
+# not debug and not verbose
+# run script on a login form example
+./target/debug/mal-js-detection --file-path js-samples/file_test.js all --url-to-visit https://www.login_example.com
 ```
 
-#### static analysis ioc
+#### static analysis ioc(s)
 
 - eval (ast)
 - execScript (ast)
 - http://urls (regex)
 - `<script></script>` in string (regex or ast)
-- document.write and element is script/link/iframe/object/embed or img/audio/video/source/track
-- withCredentials directiv ein xhr
 
-Identifiers:
+todo:
+- document.write and element is script/link/iframe/object/embed or img/audio/video/source/track
+- withCredentials directive in xhr
+
+Identifiers from `ocx` Abstract Syntax Tree:
 - StaticMemberExpression function calls: CallExpression -> callee:StaticMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
 - ComputedMemberExpression function calls:  CallExpression -> callee:ComputedMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
 
-
-#### dynamic analysis ioc
+#### dynamic analysis ioc(s)
+All ioc(s) are detected using hooks:
 
 - request on black listed ip
 - cookie.get
-- call to localStorage
+- cookie.set
+- localStorage.getItems
+- localStorage.setItems
+- creation of new html elements that can trigger network calls
+- form input data sent with HTTP request
+- call to `document.eval` and `document.execScript`
 
 #### todo
-- analyze known cookie access (eg ASP.NET cookie)
-- research more on `getEventListeners` and how it could be used
-- hook known window property access (e.g. window.sessionStorage)
-- add free domain reputation resolver (`curl 'https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/cnn.com/overview' --compressed -H 'User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0'`)
-- rename `dast` folder to sandbox
+- add more keys to known KNOWN_SENSITIVE_DATA_KEYS (eg ASP.NET cookie)
+- explore how hooks to event listeners could be used (for now all `addEventListener` calls are hooked)
+- hook window.sessionStorage

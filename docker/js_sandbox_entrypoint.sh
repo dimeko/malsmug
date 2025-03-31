@@ -4,4 +4,4 @@ export DBUS_SESSION_BUS_ADDRESS=`dbus-daemon --fork --config-file=/usr/share/dbu
 
 /etc/init.d/dbus restart
 
-node /js_dast/lib/app.js $1 $2
+node /js_sandbox/lib/app.js $1 $2
