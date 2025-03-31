@@ -210,7 +210,7 @@ function place_hooks() {
         return originalAddEventListener.apply(this, [listener, fn] as [listener: string, fn: any]);
     };
 
-    const observer = new MutationObserver((mutationList) => {
+    const documentObserver = new MutationObserver((mutationList) => {
         for (const mutation of mutationList) {
             mutation.addedNodes.forEach((node: Node) => {
                 let _event: Event = {
@@ -224,7 +224,7 @@ function place_hooks() {
         }
     });
 
-    observer.observe(document, { childList: true, subtree: true });
+    documentObserver.observe(document, { childList: true, subtree: true });
 }
 
 export {
