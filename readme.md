@@ -1,5 +1,10 @@
 #### mal-js-detector
 
+Before building we have to set the nightly builder in order to be able to use `ocx`
+```bash
+rustup override set nightly --path .
+```
+
 Build everything:
 ```bash
 cargo build

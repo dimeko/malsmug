@@ -72,11 +72,8 @@ if (!fs.existsSync(scriptFile)) {
                 })
             }
         )
-
     await page.evaluate(place_hooks);
-
     console.log(`[analysis-debug] Executing script: ${scriptFile}`);
-    
     const scriptCode = fs.readFileSync(scriptFile, "utf-8");
     
     await page.evaluate(scriptCode);
