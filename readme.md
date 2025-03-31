@@ -18,7 +18,7 @@ Run:
 
 # not debug and not verbose
 # run script on a login form example
-./target/debug/malsmug --file-path js-samples/file_test.js all --url-to-visit https://www.login_example.com
+./target/debug/malsmug --file-path js-samples/file_test.js all --url-to-visit https://www.facebook.com
 ```
 
 #### static analysis ioc(s)
