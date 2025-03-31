@@ -5,6 +5,7 @@ fn main() {
         .args([
             "build",
             ".",
+            "--rm",
             "-t",
             "js-dast",
             "-f",

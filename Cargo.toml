@@ -1,13 +1,12 @@
 [package]
 name = "malsmug"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 async-std = { version = "1.13.1", features = ["tokio1"] }
 clap = { version = "4.5.32", features = ["derive"] }
 colored = "3.0.0"
-dockers = "=0.1.6"
 env_logger = "0.11.7"
 log = "0.4.27"
 oxc = { version = "0.61.2", features = ["ast_visit", "serialize"] }

@@ -9,11 +9,11 @@ Run:
 ```bash
 # debug and verbose information
 # execute script on www.facebook.com
-./target/debug/mal-js-detection -v -d --file-path js-samples/file_test.js all --url-to-visit https://www.facebook.com
+./target/debug/malsmug -v -d --file-path js-samples/file_test.js all --url-to-visit https://www.facebook.com
 
 # not debug and not verbose
 # run script on a login form example
-./target/debug/mal-js-detection --file-path js-samples/file_test.js all --url-to-visit https://www.login_example.com
+./target/debug/malsmug --file-path js-samples/file_test.js all --url-to-visit https://www.login_example.com
 ```
 
 #### static analysis ioc(s)
