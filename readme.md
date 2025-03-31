@@ -35,3 +35,4 @@ Identifiers:
 - research more on `getEventListeners` and how it could be used
 - hook known window property access (e.g. window.sessionStorage)
 - add free domain reputation resolver (`curl 'https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/cnn.com/overview' --compressed -H 'User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0'`)
+- rename `dast` folder to sandbox

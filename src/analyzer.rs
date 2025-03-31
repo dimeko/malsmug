@@ -33,15 +33,16 @@ impl fmt::Display for Severity {
 pub struct Finding {
     pub severity: Severity,
     pub poc: String,
+    pub title: String,
 }
 
 impl fmt::Display for Finding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", format!("severity: {}, poc: {}", self.severity, self.poc))
+        write!(f, "{}", format!("title: {}, severity: {}, poc: {}", self.title,  self.severity, self.poc))
     }
 }
 
 pub trait Analyzer<'a> {
     fn get_findings(&self) -> &Vec<Finding>;
-    fn analyze(&mut self) -> Result<bool, String>;
+    async fn analyze(&mut self) -> Result<bool, String>;
 }

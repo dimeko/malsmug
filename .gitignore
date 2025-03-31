@@ -1,3 +1,4 @@
 /target
 /dast/node_modules
 /test_docker/
+/whatever/

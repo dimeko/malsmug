@@ -1,3 +1,38 @@
-console.log("This is the default script!");
-localStorage.setItem("test", "123");
-console.log(localStorage.getItem("test"));
+// Testing new html elements detection 
+function addElementsSequentially() {
+    const elements = [
+        { tag: 'iframe', attrs: { src: 'https://example.com', width: '400', height: '300' } },
+        { tag: 'img', attrs: { src: 'https://via.placeholder.com/150', alt: 'Test Image' } },
+        { tag: 'video', attrs: { src: 'https://www.w3schools.com/html/mov_bbb.mp4', controls: true, width: '300' } },
+        { tag: 'audio', attrs: { src: 'https://www.w3schools.com/html/horse.mp3', controls: true } },
+        { tag: 'embed', attrs: { src: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', width: '300', height: '200' } }
+    ];
+
+    let index = 0;
+
+    function addNextElement() {
+        if (index < elements.length) {
+            const elData = elements[index];
+            const el = document.createElement(elData.tag);
+
+            for (const [key, value] of Object.entries(elData.attrs)) {
+                el.setAttribute(key, value);
+            }
+
+            document.body.appendChild(el);
+            console.log(`Added <${elData.tag}> element to the page.`);
+
+            index++;
+            setTimeout(addNextElement, 1000);
+        }
+    }
+
+    addNextElement();
+}
+
+addElementsSequentially();
+
+// Testing cookies
+document.cookie = "important_cookie=sessionId; expires=Thu, 18 Dec 2013 12:00:00 UTC; path=/; HttpOnly";
+// testing cookie access
+document.cookie["important_cookie"]

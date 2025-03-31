@@ -18,7 +18,6 @@ WORKDIR /js_dast
 COPY --from=installer /js_dast /js_dast
 
 USER root
-RUN useradd dast
 COPY docker/js_dast_entrypoint.sh /js_dast_entrypoint.sh 
 RUN chmod +x /js_dast_entrypoint.sh 
 
