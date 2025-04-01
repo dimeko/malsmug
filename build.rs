@@ -16,9 +16,9 @@ fn main() {
     match _d {
         Ok(_status) => {
             if _status.success() {
-                println!("js-sandbox was build successfully");
+                println!("js-sandbox was built successfully");
             } else {
-                panic!("something wrong building the image")
+                panic!("error: could not build the image")
             }
         },
         Err(e) => {

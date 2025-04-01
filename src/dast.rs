@@ -10,6 +10,7 @@ use async_std::task::block_on;
 use url::Url;
 use publicsuffix::{Psl, List};
 use std::str;
+use std::env::current_dir;
 
 use crate::analyzer;
 use crate::dast_event_types;
@@ -185,7 +186,8 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         // preparing sandbox parameters
         let mut _docker_analyze_cmd = Command::new("docker");
         let mut file_volume: String = "".to_owned();
-        file_volume.push_str("./");
+        let _cur_dir = current_dir().expect("could not get current dir");
+        file_volume.push_str(_cur_dir.to_str().unwrap());
         file_volume.push_str(self.file_path.to_str().unwrap());
         file_volume.push_str(":/js_sandbox/samples/file.js");
 
@@ -277,13 +279,14 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                         }
 
                         // analysis: check for user input sent in request
-                        if _v.data.contains("fake_input_from_sandbox_") { // "fake_input_from_sandbox_" is the default input prefix that the sandbox puts inside the input fields 
-                        self.findings.push(
-                            analyzer::Finding { 
-                                severity: analyzer::Severity::VeryHigh,
-                                poc: _v.data,
-                                title: "http request sent containing user input data".to_string()
-                            });
+                        // "fake_input_from_sandbox_" is the default input prefix that the sandbox puts inside the input fields 
+                        if _v.data.contains("fake_input_from_sandbox_") { 
+                            self.findings.push(
+                                analyzer::Finding { 
+                                    severity: analyzer::Severity::VeryHigh,
+                                    poc: _v.data,
+                                    title: "http request sent containing user input data".to_string()
+                                });
                         }
                     },
                     dast_event_types::EventValue::EventHttpResponse(_v) => {
