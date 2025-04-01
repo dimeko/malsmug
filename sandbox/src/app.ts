@@ -21,7 +21,6 @@ if (!fs.existsSync(scriptFile)) {
     const browser = await puppeteer.launch({
         headless: true,
         dumpio: true,
-        executablePath: "/js_sandbox/browsers/chrome/linux-134.0.6998.35/chrome-linux64/chrome",
         args: [
             "--ignore-certificate-errors",
             "--disable-web-security",

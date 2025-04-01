@@ -8,8 +8,8 @@ RUN mkdir default
 COPY sandbox/default_samples/default.js ./default/default.js
 
 RUN npm install
-RUN mkdir browsers 
-RUN npx puppeteer browsers install chrome --path ./browsers
+RUN mkdir puppeteer_cache
+RUN npx puppeteer browsers install chrome --path ./puppeteer_cache
 
 FROM ghcr.io/puppeteer/puppeteer:latest AS release
 
@@ -21,15 +21,17 @@ COPY docker/js_sandbox_entrypoint.sh /js_sandbox_entrypoint.sh
 RUN chmod +x /js_sandbox_entrypoint.sh 
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-khmeros \
+    && apt-get install -y --no-install-recommends fonts-ipafont-gothic \
+    fonts-wqy-zenhei fonts-thai-tlwg fonts-khmeros \
     fonts-kacst fonts-freefont-ttf dbus dbus-x11
 
 ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 # ENV XDG_CONFIG_HOME=/tmp/.chromium
 # ENV XDG_CACHE_HOME=/tmp/.chromium
-
 COPY sandbox/src/ ./src/
 RUN npm run build
+
+ENV PUPPETEER_CACHE_DIR="/js_sandbox/puppeteer_cache"
 
 ENTRYPOINT ["/js_sandbox_entrypoint.sh"]
 CMD ["./default/default.js"]

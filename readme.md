@@ -1,4 +1,4 @@
-#### mal-js-detector
+#### malsmug
 
 Before building we have to set the nightly builder in order to be able to use `oxc`
 ```bash

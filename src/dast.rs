@@ -185,11 +185,11 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         // running sandbox
         // preparing sandbox parameters
         let mut _docker_analyze_cmd = Command::new("docker");
-        let mut file_volume: String = "".to_owned();
+        let mut host_file_volume: PathBuf = PathBuf::new();
         let _cur_dir = current_dir().expect("could not get current dir");
-        file_volume.push_str(_cur_dir.to_str().unwrap());
-        file_volume.push_str(self.file_path.to_str().unwrap());
-        file_volume.push_str(":/js_sandbox/samples/file.js");
+        host_file_volume = host_file_volume.join(_cur_dir).join(&self.file_path);
+        info!("host file volume: {}", host_file_volume.to_str().unwrap());
+        let volume = host_file_volume.to_str().unwrap().to_owned() + ":/js_sandbox/samples/file.js";
 
         // spinning up sandbox
         _docker_analyze_cmd.args(
@@ -197,7 +197,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                 "run",
                 "--rm",
                 "-v",
-                &file_volume.to_ascii_lowercase(),
+                &volume,
                 "--cap-add=NET_ADMIN",
                 "js-sandbox",
                 "/js_sandbox/samples/file.js",
