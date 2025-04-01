@@ -1,6 +1,7 @@
 use std::process::Command;
 
 fn main() {
+    // docker build . --rm -t js-sandbox -f ./docker/js_sandbox_Dockerfile
     let _d = Command::new("docker")
         .args([
             "build",

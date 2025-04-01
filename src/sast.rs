@@ -130,7 +130,7 @@ impl<'a> Visit<'a> for Scanner<'a> {
                 }
             }
         }
-        // continue walking in case we want to hook for visitors
+        // continue walking
         walk_call_expression(self, it);
     }
 }
@@ -162,7 +162,6 @@ impl SastAnalyzer {
     }
 
     fn _scan_ast(&mut self, ast: Program) -> Vec<StaticAnalysisIoC> {
-
         let mut scanner = Scanner { source: &self.source_text, _interesting_items: Vec::new() };
         walk::walk_program::<Scanner>(&mut scanner, &ast);
         return scanner._interesting_items

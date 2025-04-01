@@ -80,6 +80,7 @@ impl DastAnalyzer {
                 std::process::exit(1)
             }
         };
+
         DastAnalyzer { 
             file_path,
             findings: Vec::new(),
@@ -102,7 +103,7 @@ impl DastAnalyzer {
 
     // fetches given domain reputation score from spamhaus.com
     async fn _get_domain_reputation(&self, url: &str) -> f32 {
-        let  url_normalized: String = self._normalize_url(url);
+        let url_normalized: String = self._normalize_url(url);
 
         info!("_get_domain_reputation url: {}", url_normalized);
         let domain = match Url::parse(&url_normalized) {
@@ -207,6 +208,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
             .split(|b| b == &0xA)
             .map(|line| line.strip_suffix(&[0xD])
             .unwrap_or(line));
+
         // log sandbox output
         if self.log_sandbox_out {
             debug!("Sandbox output:");
@@ -218,9 +220,9 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         }
 
         let lines_stdout = output.stdout
-        .split(|b| b == &0xA)
-        .map(|line| line.strip_suffix(&[0xD])
-        .unwrap_or(line));
+            .split(|b| b == &0xA)
+            .map(|line| line.strip_suffix(&[0xD])
+            .unwrap_or(line));
         
         // log sandbox output
         if self.log_sandbox_out {
@@ -233,7 +235,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
 
         // ---------------------------------------------------
         // dynamic analysis steps
-        
+        //
         // parse and examine every line of the stdout
         // this is a simple method at the moment.  In future versions
         // we can send events in and out of the sandbox by running a server

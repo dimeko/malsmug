@@ -1,6 +1,6 @@
 #### mal-js-detector
 
-Before building we have to set the nightly builder in order to be able to use `ocx`
+Before building we have to set the nightly builder in order to be able to use `oxc`
 ```bash
 rustup override set nightly --path .
 ```
@@ -27,7 +27,7 @@ Run:
 - expression including execScript (ast)
 - call of `document.write` with potential html elements as arguments (regex or ast)
 
-Some identifiers from `ocx` Abstract Syntax Tree:
+Some identifiers from `oxc` Abstract Syntax Tree:
 - StaticMemberExpression function calls: CallExpression -> callee:StaticMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
 - ComputedMemberExpression function calls:  CallExpression -> callee:ComputedMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
 
