@@ -378,8 +378,6 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         }
         // end of analysis
         // ---------------------------------------------------
-
-
         Ok(true)
     }
 

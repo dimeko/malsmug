@@ -27,9 +27,9 @@ impl fmt::Display for Severity {
             Severity::High => write!(f, "High"),
             Severity::VeryHigh => write!(f, "Very High")
         }
-        
     }
 }
+
 pub struct Finding {
     pub severity: Severity,
     pub poc: String,

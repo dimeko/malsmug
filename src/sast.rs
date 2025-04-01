@@ -11,6 +11,7 @@ use oxc::ast_visit::{walk, Visit};
 
 use crate::analyzer;
 use crate::utils;
+
 // creating different struct here in order to be able to create
 // multiple sources for [`analyzer::Findings`]
 struct StaticAnalysisIoC {
