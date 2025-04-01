@@ -7,7 +7,7 @@ fn main() {
             ".",
             "--rm",
             "-t",
-            "js-dast",
+            "js-sandbox",
             "-f",
             "./docker/js_sandbox_Dockerfile"
         ])
@@ -15,7 +15,7 @@ fn main() {
     match _d {
         Ok(_status) => {
             if _status.success() {
-                println!("js-dast was build successfully");
+                println!("js-sandbox was build successfully");
             } else {
                 panic!("something wrong building the image")
             }
