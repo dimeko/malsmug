@@ -103,7 +103,7 @@ impl DastAnalyzer {
     }
 
     // fetches given domain reputation score from spamhaus.com
-    async fn _get_domain_reputation(&self, url: &str) -> f32 {
+    async fn _get_domain_reputation(&mut self, url: &str) -> f32 {
         let url_normalized: String = self._normalize_url(url);
 
         info!("_get_domain_reputation url: {}", url_normalized);
@@ -147,9 +147,25 @@ impl DastAnalyzer {
                 return -1.0;
             }
         };
-        debug!("checking domain: {}", domain_string);
+
+        if self.cached_domain_reputations.contains_key(domain_string) {
+            return match self.cached_domain_reputations.get(domain_string) {
+                Some(_s) => {
+                    debug!("cache hit for {} score={}", domain_string, *_s);
+                    *_s
+                },
+                None => {
+                    -1.0
+                }
+            }
+        }
+        self.cached_domain_reputations.insert(domain_string.to_string(), -1.0).map(|e|  {
+            error!("could not create cache key for {}, error: {}", domain_string, e);
+            return -1;
+        });
+        info!("checking domain: {}", domain_string);
         let spamhaus_url = format!("https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/{}/overview", domain_string);
-        debug!("{}", spamhaus_url);
+
         let _client = reqwest::blocking::Client::new();
         let response = _client.get(spamhaus_url)
                 .header("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0")
@@ -165,11 +181,20 @@ impl DastAnalyzer {
                     },
                     Err(_e) => {
                         warn!("could not determine domain reputation, putting default value: {}", DEFAULT_DOMAIN_REPUTATION);
+                        self.cached_domain_reputations
+                            .entry(domain_string.to_string())
+                            .and_modify(|e| { *e = DEFAULT_DOMAIN_REPUTATION })
+                            .or_insert(DEFAULT_DOMAIN_REPUTATION);
                         return DEFAULT_DOMAIN_REPUTATION; // return a value for domains that are not found
                     }
                 };
-                debug!("{:?}", _domain_resp);
-                debug!("reputation score: {}", _domain_resp.score);
+                // self.cached_domain_reputations.entry(domain_string.to_string()).or_insert(_domain_resp.score);
+                self.cached_domain_reputations
+                    .entry(domain_string.to_string())
+                    .and_modify(|e| { *e = _domain_resp.score })
+                    .or_insert(_domain_resp.score);
+
+                info!("reputation score for {}: {}", domain_string, _domain_resp.score);
                 return _domain_resp.score
             },
             Err(_err) => {
@@ -213,7 +238,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
 
         // log sandbox output
         if self.log_sandbox_out {
-            debug!("Sandbox output:");
+            println!("--------------- sandbox output:");
             for mut _l in lines_stderr.clone() {
                 let mut buf = String::new();
                 let _ = _l.read_to_string(&mut buf);
@@ -258,22 +283,12 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                 match event.value {
                     dast_event_types::EventValue::EventHttpRequest(_v) => {
                         // analysis: check response url domain reputation
-                        if self.cached_domain_reputations.get(&_v.url) == None {
-                            let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
-                            self.cached_domain_reputations.insert(
-                                _v.url.clone(),
-                                _score
-                                ).map(|_e| {
-                                    error!("err: {}, could not get reputation score: {}",_e, _v.url);
-                                    return -1;
-                                });
-                        }
-                        
-                        if self.cached_domain_reputations[&_v.url] <= 20.0 && self.cached_domain_reputations[&_v.url] > 0.0 {
+                        let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
+                        if _score <= 20.0 && _score > 0.0 {
                             self.findings.push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::High,
-                                    poc: _v.url.clone(),
+                                    poc: _v.url,
                                     title: "bad reputation url called".to_string()
                                 });
                         }
@@ -291,17 +306,8 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                     },
                     dast_event_types::EventValue::EventHttpResponse(_v) => {
                         // analysis: check response url domain reputation
-                        if self.cached_domain_reputations.get(&_v.url) == None {
-                            let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
-                            self.cached_domain_reputations.insert(
-                                _v.url.clone(),
-                                _score
-                                ).map(|_e| {
-                                    error!("err: {}, could not get reputation score: {}",_e, _v.url);
-                                    return -1;
-                                });
-                        }
-                        if self.cached_domain_reputations[&_v.url] <= 20.0 && self.cached_domain_reputations[&_v.url] > 0.0 {
+                        let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
+                        if _score <= 20.0 && _score > 0.0 {
                             self.findings.push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::High,
@@ -309,6 +315,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                                     title: "bad reputation url called".to_string()
                                 });
                         }
+
                     },
                     dast_event_types::EventValue::EventNewHtmlElement(_v) => {
                         // analysis: check if the target creates new html elements that can potentially access the internet
