@@ -4,7 +4,6 @@ FROM ghcr.io/puppeteer/puppeteer:latest AS installer
 WORKDIR /js_sandbox
 COPY sandbox/package.json sandbox/tsconfig.json ./
 
-RUN mkdir samples
 RUN mkdir default
 COPY sandbox/default_samples/default.js ./default/default.js
 

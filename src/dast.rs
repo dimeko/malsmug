@@ -196,7 +196,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                 "-v",
                 &file_volume.to_ascii_lowercase(),
                 "--cap-add=NET_ADMIN",
-                "js-dast",
+                "js-sandbox",
                 "/js_sandbox/samples/file.js",
                 &self.test_url_to_visit
             ]
