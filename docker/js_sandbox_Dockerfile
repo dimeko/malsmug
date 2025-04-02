@@ -1,7 +1,12 @@
 FROM ghcr.io/puppeteer/puppeteer:latest AS installer
-# puppeteer:24.4.0
 
 WORKDIR /js_sandbox
+
+USER root
+RUN chown -Rh pptruser:pptruser /js_sandbox
+
+USER pptruser
+
 COPY sandbox/package.json sandbox/tsconfig.json ./
 
 RUN mkdir default
@@ -15,9 +20,10 @@ FROM ghcr.io/puppeteer/puppeteer:latest AS release
 
 WORKDIR /js_sandbox
 COPY --from=installer /js_sandbox /js_sandbox
+COPY docker/js_sandbox_entrypoint.sh /js_sandbox_entrypoint.sh 
 
 USER root
-COPY docker/js_sandbox_entrypoint.sh /js_sandbox_entrypoint.sh 
+RUN chown -Rh pptruser:pptruser /js_sandbox
 RUN chmod +x /js_sandbox_entrypoint.sh 
 
 RUN apt-get update \
@@ -26,8 +32,11 @@ RUN apt-get update \
     fonts-kacst fonts-freefont-ttf dbus dbus-x11
 
 ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
-# ENV XDG_CONFIG_HOME=/tmp/.chromium
-# ENV XDG_CACHE_HOME=/tmp/.chromium
+RUN export DBUS_SESSION_BUS_ADDRESS=`dbus-daemon --fork --config-file=/usr/share/dbus-1/session.conf --print-address`
+RUN /etc/init.d/dbus restart
+
+USER pptruser
+
 COPY sandbox/src/ ./src/
 RUN npm run build
 
