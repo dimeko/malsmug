@@ -58,9 +58,9 @@ struct SpamHausResponse {
     last_seen: u64,
     tags: Vec<String>,
     abused: bool,
-    whois: Value,          // Generic JSON for whois
+    whois: Value,
     score: f32,
-    dimensions: Value,     // Generic JSON for dimensions
+    dimensions: Value
 }
 
 pub struct DastAnalyzer {

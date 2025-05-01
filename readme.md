@@ -46,8 +46,8 @@ Options:
 - call of `document.write` with potential html elements as arguments (regex or ast)
 
 Some identifiers from `oxc` Abstract Syntax Tree:
-- StaticMemberExpression function calls: CallExpression -> callee:StaticMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
-- ComputedMemberExpression function calls:  CallExpression -> callee:ComputedMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]
+- StaticMemberExpression function calls: `CallExpression -> callee:StaticMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]`
+- ComputedMemberExpression function calls:  `CallExpression -> callee:ComputedMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]`
 
 #### dynamic analysis ioc(s)
 
@@ -64,6 +64,6 @@ Some identifiers from `oxc` Abstract Syntax Tree:
 - suspicious form input data sent with HTTP request
 
 #### todo
-- add more keys to known KNOWN_SENSITIVE_DATA_KEYS (eg ASP.NET cookie)
+- add more keys to known `KNOWN_SENSITIVE_DATA_KEYS` (eg `ASP.NET` cookie)
 - explore how hooks to event listeners could be used (for now all `addEventListener` calls are hooked)
-- hook window.sessionStorage
+- hook `window.sessionStorage`
