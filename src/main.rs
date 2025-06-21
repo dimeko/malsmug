@@ -9,8 +9,10 @@ mod sast;
 mod dast;
 mod dast_event_types;
 mod utils;
+mod server;
 
 use analyzer::Analyzer;
+use server::ServerMethods;
 
 const DEFAULT_URL_TO_VISIT: &'static str = "https://google.com";
 #[derive(Parser)]
@@ -75,35 +77,39 @@ fn run_dast(file_path: PathBuf, url_to_visit: String, log_sandbox_out: bool) {
     }).unwrap();
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut builder = Builder::from_default_env();
 
     let mut log_level: log::LevelFilter = log::LevelFilter::Warn;
-    let cli_args = Args::parse();
+    // let cli_args = Args::parse();
 
-    if cli_args.verbose {
-        log_level = log::LevelFilter::Info;
-    }
+    // if cli_args.verbose {
+    //     log_level = log::LevelFilter::Info;
+    // }
 
-    if cli_args.debug {
-        log_level = log::LevelFilter::Debug;
-    }
+    // if cli_args.debug {
+    //     log_level = log::LevelFilter::Debug;
+    // }
 
     builder
         .filter(None, log_level)
         .init();
-    
-    info!("analyzing file: {}", &cli_args.file_path.to_str().unwrap());
-    match cli_args.command {
-        CliCommand::Dast { url_to_visit } => {
-            run_dast(cli_args.file_path, url_to_visit, cli_args.debug);
-        },
-        CliCommand::Sast {} => {
-            run_sast(cli_args.file_path);
-        },
-        CliCommand::All { url_to_visit } => {
-            run_sast(cli_args.file_path.clone());
-            run_dast(cli_args.file_path, url_to_visit, cli_args.debug);
-        }
-    }
+
+    let s = server::Server::new("127.0.0.1:11223");
+    let _ = s.start().await;
+
+    // info!("analyzing file: {}", &cli_args.file_path.to_str().unwrap());
+    // match cli_args.command {
+    //     CliCommand::Dast { url_to_visit } => {
+    //         run_dast(cli_args.file_path, url_to_visit, cli_args.debug);
+    //     },
+    //     CliCommand::Sast {} => {
+    //         run_sast(cli_args.file_path);
+    //     },
+    //     CliCommand::All { url_to_visit } => {
+    //         run_sast(cli_args.file_path.clone());
+    //         run_dast(cli_args.file_path, url_to_visit, cli_args.debug);
+    //     }
+    // }
 }

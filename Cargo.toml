@@ -4,15 +4,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+amqprs = "2.1.2"
+anyhow = "1.0.98"
 async-std = { version = "1.13.1", features = ["tokio1"] }
+axum = {version = "0.8.4", features = ["multipart"]}
 clap = { version = "4.5.32", features = ["derive"] }
 colored = "3.0.0"
 env_logger = "0.11.7"
 log = "0.4.27"
+multipart = {version = "0.18.0", features = ["client"]}
 oxc = { version = "0.61.2", features = ["ast_visit", "serialize"] }
 publicsuffix = "2.3.0"
 regex = "1.11.1"
 reqwest = {version = "0.12.15", features = ["blocking", "json"]}
 serde = "1.0.219"
 serde_json = "1.0.140"
+tokio = "1.45.1"
 url = "2.5.4"
