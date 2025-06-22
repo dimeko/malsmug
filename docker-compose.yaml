@@ -15,6 +15,14 @@ services:
     volumes:
       - rabbitmq-lib:/var/lib/rabbitmq/
       - rabbitmq-log:/var/log/rabbitmq
+  sandbox:
+    build:
+      context: ./docker
+      dockerfile: sandbox_Dockerfile
+    image: js-sandbox
+    container_name: js-sandbox-av
+    cap_add:
+      - NET_ADMIN # this capability is needed in case we want to block outgoing TCP traffic
 
 configs:
   rabbitmq-plugins:

@@ -1,9 +1,9 @@
 FROM ghcr.io/puppeteer/puppeteer:latest AS installer
 
-WORKDIR /js_sandbox
+WORKDIR /sandbox
 
 USER root
-RUN chown -Rh pptruser:pptruser /js_sandbox
+RUN chown -Rh pptruser:pptruser /sandbox
 
 USER pptruser
 
@@ -18,13 +18,13 @@ RUN npx puppeteer browsers install chrome --path ./puppeteer_cache
 
 FROM ghcr.io/puppeteer/puppeteer:latest AS release
 
-WORKDIR /js_sandbox
-COPY --from=installer /js_sandbox /js_sandbox
-COPY docker/js_sandbox_entrypoint.sh /js_sandbox_entrypoint.sh 
+WORKDIR /sandbox
+COPY --from=installer /sandbox /sandbox
+COPY docker/sandbox_entrypoint.sh /sandbox_entrypoint.sh 
 
 USER root
-RUN chown -Rh pptruser:pptruser /js_sandbox
-RUN chmod +x /js_sandbox_entrypoint.sh 
+RUN chown -Rh pptruser:pptruser /sandbox
+RUN chmod +x /sandbox_entrypoint.sh 
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends fonts-ipafont-gothic \
@@ -40,7 +40,7 @@ USER pptruser
 COPY sandbox/src/ ./src/
 RUN npm run build
 
-ENV PUPPETEER_CACHE_DIR="/js_sandbox/puppeteer_cache"
+ENV PUPPETEER_CACHE_DIR="/sandbox/puppeteer_cache"
 
-ENTRYPOINT ["/js_sandbox_entrypoint.sh"]
+ENTRYPOINT ["/sandbox_entrypoint.sh"]
 CMD ["./default/default.js"]

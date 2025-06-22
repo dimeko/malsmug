@@ -209,56 +209,56 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
     fn analyze(&mut self) -> Result<bool, String> {
         // running sandbox
         // preparing sandbox parameters
-        let mut _docker_analyze_cmd = Command::new("docker");
-        let mut host_file_volume: PathBuf = PathBuf::new();
-        let _cur_dir = current_dir().expect("could not get current dir");
-        host_file_volume = host_file_volume.join(_cur_dir).join(&self.file_path);
-        info!("host file volume: {}", host_file_volume.to_str().unwrap());
-        let volume = host_file_volume.to_str().unwrap().to_owned() + ":/js_sandbox/samples/file.js";
+        // let mut _docker_analyze_cmd = Command::new("docker");
+        // let mut host_file_volume: PathBuf = PathBuf::new();
+        // let _cur_dir = current_dir().expect("could not get current dir");
+        // host_file_volume = host_file_volume.join(_cur_dir).join(&self.file_path);
+        // info!("host file volume: {}", host_file_volume.to_str().unwrap());
+        // let volume = host_file_volume.to_str().unwrap().to_owned() + ":/sandbox/samples/file.js";
 
-        // spinning up sandbox
-        _docker_analyze_cmd.args(
-            [
-                "run",
-                "--rm",
-                "-v",
-                &volume,
-                "--cap-add=NET_ADMIN",
-                "js-sandbox",
-                "/js_sandbox/samples/file.js",
-                &self.test_url_to_visit
-            ]
-        );
+        // // spinning up sandbox
+        // _docker_analyze_cmd.args(
+        //     [
+        //         "run",
+        //         "--rm",
+        //         "-v",
+        //         &volume,
+        //         "--cap-add=NET_ADMIN",
+        //         "js-sandbox",
+        //         "/sandbox/samples/file.js",
+        //         &self.test_url_to_visit
+        //     ]
+        // );
 
-        let output = _docker_analyze_cmd.output().expect("docker command failed");
-        let lines_stderr = output.stderr
-            .split(|b| b == &0xA)
-            .map(|line| line.strip_suffix(&[0xD])
-            .unwrap_or(line));
+        // let output = _docker_analyze_cmd.output().expect("docker command failed");
+        // let lines_stderr = output.stderr
+        //     .split(|b| b == &0xA)
+        //     .map(|line| line.strip_suffix(&[0xD])
+        //     .unwrap_or(line));
 
         // log sandbox output
-        if self.log_sandbox_out {
-            println!("--------------- sandbox output:");
-            for mut _l in lines_stderr.clone() {
-                let mut buf = String::new();
-                let _ = _l.read_to_string(&mut buf);
-                println!("  {}", buf);
-            }
-        }
+        // if self.log_sandbox_out {
+        //     println!("--------------- sandbox output:");
+        //     for mut _l in lines_stderr.clone() {
+        //         let mut buf = String::new();
+        //         let _ = _l.read_to_string(&mut buf);
+        //         println!("  {}", buf);
+        //     }
+        // }
 
-        let lines_stdout = output.stdout
-            .split(|b| b == &0xA)
-            .map(|line| line.strip_suffix(&[0xD])
-            .unwrap_or(line));
+        // let lines_stdout = output.stdout
+        //     .split(|b| b == &0xA)
+        //     .map(|line| line.strip_suffix(&[0xD])
+        //     .unwrap_or(line));
         
         // log sandbox output
-        if self.log_sandbox_out {
-            for mut _l in lines_stdout.clone() {
-                let mut buf = String::new();
-                let _ = _l.read_to_string(&mut buf);
-                println!("  {}", buf);
-            }
-        }
+        // if self.log_sandbox_out {
+        //     for mut _l in lines_stdout.clone() {
+        //         let mut buf = String::new();
+        //         let _ = _l.read_to_string(&mut buf);
+        //         println!("  {}", buf);
+        //     }
+        // }
 
         // ---------------------------------------------------
         // dynamic analysis steps
@@ -267,7 +267,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         // this is a simple method at the moment.  In future versions
         // we can send events in and out of the sandbox by running a server
         // on the host
-        for mut _l in lines_stdout {
+        for mut _l in lines_stdout { // Here we actually need to loop over a list of actual Events
             let mut buf = String::new();
             let _ = _l.read_to_string(&mut buf);
             if let Some(pos) = buf.find("[event]:") {

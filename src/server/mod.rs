@@ -7,8 +7,14 @@ use axum::{
 use amqprs::{
     callbacks::{DefaultChannelCallback, DefaultConnectionCallback}, channel::{BasicConsumeArguments, BasicPublishArguments, Channel, QueueBindArguments, QueueDeclareArguments}, connection::{Connection, OpenConnectionArguments}, security::SecurityCredentials, BasicProperties
 };
+use std::thread;
 use log::info;
+use log::error;
+
 use serde::{Deserialize, Serialize};
+
+use crate::store;
+use store::Store;
 
 // #[derive(Clone)]
 // struct RabbitMQClient {
@@ -34,12 +40,15 @@ pub trait ServerMethods<'a> {
 
 pub struct Server<'a> {
     bindhost: &'a str,
+    store: Store
 }
 
 impl<'a> Server<'a> {
     pub fn new(h: &'a str) -> Self {
+        let store = Store::new("sqlite");
         Self {
             bindhost: h,
+            store
         }
     }
 }
@@ -49,6 +58,7 @@ async fn submit_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
     let mut chunk_number = 0;
     let mut total_chunks = 0;
     let mut chunk_data = Vec::new();
+    let mut total_file_bytes: Vec<u8> = Vec::new();
     while let Some(field) = match multipart.next_field().await {
         Ok(f) => f,
         Err(err) => {
@@ -60,7 +70,13 @@ async fn submit_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
             "fileName" => file_name = field.text().await.unwrap_or_default(),
             "chunkNumber" => chunk_number = field.text().await.unwrap_or_default().parse().unwrap_or(0),
             "totalChunks" => total_chunks = field.text().await.unwrap_or_default().parse().unwrap_or(0),
-            "chunk" => chunk_data = field.bytes().await.unwrap_or_else(|_| Vec::new().into()).to_vec(),
+            "chunk" => {
+                chunk_data = field.bytes().await.unwrap_or_else(|_| {
+                    error!("could not parse {:d} chunk of file", chunk_number);
+                    Vec::new().into()
+                }).to_vec();
+                [&total_file_bytes[..], &chunk_data[..]].concat();
+            },
             _ => {}
         }
     }
@@ -113,6 +129,12 @@ impl<'a> ServerMethods<'a> for Server<'a> {
             ))
             .await
             .unwrap();
+
+        thread::spawn(|| {
+            loop {
+                channel.co
+            }
+        })
 
         let app = Router::new().layer(
             Extension(ApiContext {

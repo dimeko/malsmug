@@ -35,12 +35,12 @@ if (!fs.existsSync(scriptFile)) {
         ]
     });
 
-
     let rbmqc = await RBMQ.create(
         "rabbitmq:5672",
         "change_me_exchange_name",
         "change_me_routing_key"
     )
+
     while(true) {
         await rbmqc.consume(RABBITMQ_FILES_FOR_ANALYSIS, async (buff: Buffer<ArrayBufferLike>) => {
                 console.log("[analysis-debug] Launched ...");

@@ -4,10 +4,11 @@ use log::info;
 use env_logger::Builder;
 use colored::Colorize;
 
-mod analyzer;
-mod sast;
-mod dast;
-mod dast_event_types;
+// mod analyzer;
+// mod sast;
+// mod dast;
+// mod dast_event_types;
+mod store;
 mod utils;
 mod server;
 
@@ -50,32 +51,31 @@ enum CliCommand {
     },
 }
 
+// fn run_sast(file_path: PathBuf) {
+//     info!("starting static analyzer");
+//     let mut sast = sast::SastAnalyzer::new(file_path);
+//     sast.analyze().and_then(|_| {
+//         let _findings = sast.get_findings();
+//         info!("static analysis findings");
+//         for _f in _findings.iter() {
+//             println!("{}: {}", "sast finding".red(), _f);
+//         }
+//         Ok(true)
+//     }).unwrap();
+// }
 
-fn run_sast(file_path: PathBuf) {
-    info!("starting static analyzer");
-    let mut sast = sast::SastAnalyzer::new(file_path);
-    sast.analyze().and_then(|_| {
-        let _findings = sast.get_findings();
-        info!("static analysis findings");
-        for _f in _findings.iter() {
-            println!("{}: {}", "sast finding".red(), _f);
-        }
-        Ok(true)
-    }).unwrap();
-}
-
-fn run_dast(file_path: PathBuf, url_to_visit: String, log_sandbox_out: bool) {
-    info!("starting dynamic analyzer");
-    let mut dast = dast::DastAnalyzer::new(file_path, url_to_visit, log_sandbox_out);
-    dast.analyze().and_then(|_| {
-        let _findings = dast.get_findings();
-        info!("dynamic analysis findings");
-        for _f in _findings.iter() {
-            println!("{}: {}", "dast finding".red(), _f);
-        }
-        Ok(true)
-    }).unwrap();
-}
+// fn run_dast(file_path: PathBuf, url_to_visit: String, log_sandbox_out: bool) {
+//     info!("starting dynamic analyzer");
+//     let mut dast = dast::DastAnalyzer::new(file_path, url_to_visit, log_sandbox_out);
+//     dast.analyze().and_then(|_| {
+//         let _findings = dast.get_findings();
+//         info!("dynamic analysis findings");
+//         for _f in _findings.iter() {
+//             println!("{}: {}", "dast finding".red(), _f);
+//         }
+//         Ok(true)
+//     }).unwrap();
+// }
 
 #[tokio::main]
 async fn main() {
