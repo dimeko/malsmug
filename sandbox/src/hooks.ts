@@ -59,7 +59,7 @@ type Event = {
         EventAddEventListener,
 }
 
-function place_hooks() {
+function place_hooks(reportFnName: string) {
     const originalSetItem = window.localStorage.setItem;
     window.localStorage.setItem = function (key: string, value: string) {
         let _event: Event = {
@@ -69,7 +69,9 @@ function place_hooks() {
                 arguments: [key, value]
             } as EventFunctionCall
         }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        ;
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalSetItem.apply(this, [key, value] as [key: string, value: string]);
     };
 
@@ -81,8 +83,9 @@ function place_hooks() {
                 callee: "window.localStorage.getItem",
                 arguments: [key]
             } as EventFunctionCall
-        }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalGetItem.apply(this, [key] as [key: string]);
     };
 
@@ -94,8 +97,9 @@ function place_hooks() {
                 callee: "document.write",
                 arguments: [code]
             } as EventFunctionCall
-        }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalDocumentWrite.apply(this, [code] as [code: string]);
     };
 
@@ -107,8 +111,9 @@ function place_hooks() {
                 callee: "window.eval",
                 arguments: [code]
             } as EventFunctionCall
-        }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalEval.apply(this, [code] as [code: string]);
     };
 
@@ -124,8 +129,9 @@ function place_hooks() {
                     callee: "window.execScript",
                     arguments: [code]
                 } as EventFunctionCall
-            }
-            console.log(`[event]:${JSON.stringify(_event)}`);
+            };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
             return originalExecScript.apply(this, [code] as [code: string]);
         };
     }
@@ -139,8 +145,9 @@ function place_hooks() {
                 method: "GET",
                 data: ""
             } as EventHttpRequest
-        }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalFetch.apply(this, args);
     };
 
@@ -153,8 +160,9 @@ function place_hooks() {
                 method: args[0],
                 data: ""
             } as EventHttpRequest
-        }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalXHROpen.apply(this, args);
     };
 
@@ -169,8 +177,9 @@ function place_hooks() {
                 method: "",
                 data: JSON.stringify(args)
             } as EventHttpRequest
-        }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalXHRSend.apply(this, args);
     };
 
@@ -182,8 +191,9 @@ function place_hooks() {
                 value: {
                     cookie: originalCookies,
                 } as EventGetCookie
-            }
-            console.log(`[event]:${JSON.stringify(_event)}`);
+            };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
             return originalCookies;
         },
         set: function (value) {
@@ -192,8 +202,9 @@ function place_hooks() {
                 value: {
                     cookie: value,
                 } as EventSetCookie
-            }
-            console.log(`[event]:${JSON.stringify(_event)}`);
+            };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
             originalCookies += value + "; "; 
         }
     });
@@ -205,8 +216,9 @@ function place_hooks() {
             value: {
                 listener: listener
             } as EventAddEventListener
-        }
-        console.log(`[event]:${JSON.stringify(_event)}`);
+        };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
         return originalAddEventListener.apply(this, [listener, fn] as [listener: string, fn: any]);
     };
 
@@ -218,8 +230,9 @@ function place_hooks() {
                     value: {
                         elementType: node.nodeName.toLowerCase()
                     } as EventNewHtmlElement
-                }
-                console.log(`[event]:${JSON.stringify(_event)}`);
+                };
+        (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+
             });
         }
     });
