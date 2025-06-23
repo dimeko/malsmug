@@ -44,8 +44,8 @@ pub struct Server<'a> {
 }
 
 impl<'a> Server<'a> {
-    pub fn new(h: &'a str) -> Self {
-        let store = Store::new("sqlite");
+    pub async fn new(h: &'a str) -> Self {
+        let store = Store::new("sqlite").await;
         Self {
             bindhost: h,
             store
@@ -72,7 +72,7 @@ async fn submit_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
             "totalChunks" => total_chunks = field.text().await.unwrap_or_default().parse().unwrap_or(0),
             "chunk" => {
                 chunk_data = field.bytes().await.unwrap_or_else(|_| {
-                    error!("could not parse {:d} chunk of file", chunk_number);
+                    error!("could not parse {} chunk of file", chunk_number);
                     Vec::new().into()
                 }).to_vec();
                 [&total_file_bytes[..], &chunk_data[..]].concat();
@@ -130,11 +130,11 @@ impl<'a> ServerMethods<'a> for Server<'a> {
             .await
             .unwrap();
 
-        thread::spawn(|| {
-            loop {
-                channel.co
-            }
-        })
+        // thread::spawn(|| {
+        //     loop {
+        //         channel.co
+        //     }
+        // });
 
         let app = Router::new().layer(
             Extension(ApiContext {

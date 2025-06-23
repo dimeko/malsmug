@@ -12,7 +12,6 @@ mod store;
 mod utils;
 mod server;
 
-use analyzer::Analyzer;
 use server::ServerMethods;
 
 const DEFAULT_URL_TO_VISIT: &'static str = "https://google.com";
@@ -96,7 +95,7 @@ async fn main() {
         .filter(None, log_level)
         .init();
 
-    let s = server::Server::new("127.0.0.1:11223");
+    let s = server::Server::new("127.0.0.1:11223").await;
     let _ = s.start().await;
 
     // info!("analyzing file: {}", &cli_args.file_path.to_str().unwrap());

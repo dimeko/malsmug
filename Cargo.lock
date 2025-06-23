@@ -1531,6 +1531,7 @@ version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149"
 dependencies = [
+ "cc",
  "pkg-config",
  "vcpkg",
 ]
@@ -1588,10 +1589,12 @@ dependencies = [
  "amqprs",
  "anyhow",
  "async-std",
+ "async-trait",
  "axum",
  "clap",
  "colored",
  "env_logger",
+ "libsqlite3-sys",
  "log 0.4.27",
  "multipart",
  "oxc",
@@ -3086,6 +3089,7 @@ dependencies = [
  "indexmap",
  "log 0.4.27",
  "memchr",
+ "native-tls",
  "once_cell",
  "percent-encoding 2.3.1",
  "serde",
@@ -3093,6 +3097,8 @@ dependencies = [
  "sha2",
  "smallvec",
  "thiserror",
+ "tokio",
+ "tokio-stream",
  "tracing",
  "url 2.5.4",
 ]
@@ -3131,6 +3137,7 @@ dependencies = [
  "sqlx-postgres",
  "sqlx-sqlite",
  "syn",
+ "tokio",
  "url 2.5.4",
 ]
 
@@ -3465,6 +3472,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-stream"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eca58d7bba4a75707817a2c44174253f9236b2d5fbd055602e9d5c07c139a047"
+dependencies = [
+ "futures-core",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3700,6 +3718,7 @@ version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cf4199d1e5d15ddd86a694e4d0dffa9c323ce759fea589f00fef9d81cc1931d"
 dependencies = [
+ "getrandom 0.3.2",
  "js-sys",
  "wasm-bindgen",
 ]

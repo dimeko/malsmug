@@ -1,39 +1,40 @@
 
-use super::{models::FileAnalysisReportStore, FileAnalysisReportStoreStore};
+use super::{models::FileAnalysisReport, FileAnalysisReportStoreTrait};
+use sqlx::{Pool, Sqlite, Error};
+use uuid::{Uuid};
 use async_trait::async_trait;
-use sqlx::SqlitePool;
-use uuid::{self, Uuid};
-pub struct SqliteFileAnalysisReport {
-    pool: SqlitePool,
+pub struct FileAnalysisReportStore {
+    pool: Pool<Sqlite>,
 }
 
-impl SqliteFileAnalysisReport {
-    pub fn new(pool: SqlitePool) -> Self {
+impl FileAnalysisReportStore {
+    pub fn new(pool: Pool<Sqlite>) -> Self {
         Self { pool }
     }
 }
 
-#[async_trait]
-impl FileAnalysisReportStore for SqliteFileAnalysisReport {
-    async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport> {
-        sqlx::query_as!(FileAnalysisReport, "SELECT
-            uid,
-            name,
-            file_hash,
-            file_name,
-            analysis_report_description, FROM file_analysis_reports WHERE uid = ?", uid)
+// #[async_trait]
+impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
+    async fn get_file_report(&self, uid: &str) -> Result<(), Error> {
+        let reports = sqlx::query_as!(
+            FileAnalysisReport, r#"SELECT uid,
+                name,
+                file_hash,
+                file_name,
+                analysis_report_description
+                FROM file_analysis_reports WHERE uid = ?"#, uid)
             .fetch_optional(&self.pool)
-            .await
-            .ok()
-            .flatten()
+            .await?;
+            Ok(())
     }
 
-    async fn create_file_report(&self, report: FileAnalysisReport) -> Option<User> {
-        let new_uuid = Uuid::new_v6();
-        report.uid = new_uuid; // TODO: generate uuid
-        sqlx::query!("INSERT INTO file_analysis_reports" \
-                "(uid, name, file_hash, file_name, analysis_report_description" \
-                "VALUES (?,?,?,?,?)",
+    async fn create_file_report(&self, mut report: FileAnalysisReport) -> Result<(), Error> {
+        let new_uuid = Uuid::new_v4();
+        report.uid = new_uuid.to_string(); // TODO: generate uuid
+    
+        sqlx::query!(r#"INSERT INTO file_analysis_reports
+                (uid, name, file_hash, file_name, analysis_report_description)
+                VALUES (?,?,?,?,?)"#,
             report.uid,
             report.name,
             report.file_hash,
