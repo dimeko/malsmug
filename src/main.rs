@@ -15,6 +15,7 @@ mod server;
 use server::ServerMethods;
 
 const DEFAULT_URL_TO_VISIT: &'static str = "https://google.com";
+const SERVER_ADDRESS: &'static str = "127.0.0.1:11234";
 #[derive(Parser)]
 struct Args {
     #[command(subcommand)]
@@ -80,7 +81,7 @@ enum CliCommand {
 async fn main() {
     let mut builder = Builder::from_default_env();
 
-    let mut log_level: log::LevelFilter = log::LevelFilter::Warn;
+    let log_level: log::LevelFilter = log::LevelFilter::Debug;
     // let cli_args = Args::parse();
 
     // if cli_args.verbose {
@@ -95,7 +96,8 @@ async fn main() {
         .filter(None, log_level)
         .init();
 
-    let s = server::Server::new("127.0.0.1:11223").await;
+    info!("running server on {}", SERVER_ADDRESS);
+    let s = server::Server::new(SERVER_ADDRESS).await;
     let _ = s.start().await;
 
     // info!("analyzing file: {}", &cli_args.file_path.to_str().unwrap());

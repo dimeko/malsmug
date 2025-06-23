@@ -17,8 +17,8 @@ services:
       - rabbitmq-log:/var/log/rabbitmq
   sandbox:
     build:
-      context: ./docker
-      dockerfile: sandbox_Dockerfile
+      context: .
+      dockerfile: ./docker/sandbox_Dockerfile
     image: js-sandbox
     container_name: js-sandbox-av
     cap_add:

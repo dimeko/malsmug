@@ -1,5 +1,5 @@
 // import amqplib from "amqplib"
-import amqplib from 'amqplib';
+import amqplib, { GetMessage } from 'amqplib';
 
 class RBMQ {
     private host: string;
@@ -24,26 +24,43 @@ class RBMQ {
     } 
 
     private async init() {
-        this.conn = await amqplib.connect("amqp://" + this.host , "heartbeat=60")
+        let connection_options: amqplib.Options.Connect = {
+            hostname: this.host,
+            port: 5672,
+            protocol: "amqp",
+            username: "ruser",
+            password: "rpassword"
+        }
+        this.conn = await amqplib.connect(connection_options, "heartbeat=60")
         this.channel = await this.conn.createChannel();
     }
 
     async publish(queue: string, message: any) {
         if(this.channel == null) return null
-        await this.channel.assertQueue(queue, { durable: true });
-        this.channel.sendToQueue(queue, Buffer.from(message));
+        await this.channel.assertQueue(queue, { durable: true, autoDelete: true });
+        this.channel.sendToQueue(queue, Buffer.from("testing the sending bufefer"));
     }
 
     async consume(queue: string, cb: (bytesAsString: Buffer<ArrayBufferLike>) => void) {
         if(this.channel == null) return null
-        await this.channel.assertQueue(queue, { durable: true });
-        await this.channel.consume(
-            queue,
-            (msg) => {
-                if(msg == null) return;
-                cb(msg.content)
-            }
-        )
+        await this.channel.assertQueue(queue, { durable: true, autoDelete: true });
+        this.channel.get(queue, {
+            noAck: false
+        }).then(async (getMsg: GetMessage | false) => {
+            if(!getMsg) {return} 
+            await cb(getMsg.content)
+            this.channel?.ack(getMsg, false)
+        }).catch((err) => {
+            console.log("[analysis-debug] Got error from queue: ", err)
+        })
+        // await this.channel.consume(
+        //     queue,
+        //     async (msg) => {
+        //         if(msg == null) return;
+        //         await cb(msg.content)
+        //     },
+            
+        // )
     } 
 }
 
