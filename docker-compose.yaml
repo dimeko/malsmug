@@ -21,6 +21,8 @@ services:
       dockerfile: ./docker/sandbox_Dockerfile
     image: js-sandbox
     container_name: js-sandbox-av
+    volumes:
+      - ./sandbox/consumer/main.py:/sandbox/consumer/main.py
     cap_add:
       - NET_ADMIN # this capability is needed in case we want to block outgoing TCP traffic
 

@@ -8,9 +8,7 @@ RUN chown -Rh pptruser:pptruser /sandbox
 USER pptruser
 
 COPY sandbox/package.json sandbox/tsconfig.json ./
-
-RUN mkdir default
-COPY sandbox/default_samples/default.js ./default/default.js
+# COPY sandbox/default_samples/default.js ./default/default.js
 
 RUN npm install
 RUN mkdir puppeteer_cache
@@ -35,12 +33,25 @@ ENV DBUS_SESSION_BUS_ADDRESS=autolaunch:
 RUN export DBUS_SESSION_BUS_ADDRESS=`dbus-daemon --fork --config-file=/usr/share/dbus-1/session.conf --print-address`
 RUN /etc/init.d/dbus restart
 
+RUN apt-get update
+RUN apt-get install -y python3
+RUN apt-get install -y python3-pip
+RUN apt-get install -y python3-venv
+
+RUN python3 -m venv /sandbox/consumer/venv
+RUN chown -R pptruser:pptruser /sandbox/consumer/
+
 USER pptruser
 
+ENV PATH="/sandbox/consumer/venv/bin:$PATH"
 COPY sandbox/src/ ./src/
+COPY sandbox/consumer/ ./consumer/
+
 RUN npm run build
+
+RUN mkdir samples
 
 ENV PUPPETEER_CACHE_DIR="/sandbox/puppeteer_cache"
 
 ENTRYPOINT ["/sandbox_entrypoint.sh"]
-CMD ["./default/default.js"]
+# CMD ["./default/default.js"]

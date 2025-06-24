@@ -1,0 +1,1 @@
+rabbitmq-client==2.4.0
