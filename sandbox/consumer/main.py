@@ -53,6 +53,9 @@ def run(samples_dir="", sandbox_lib="", bait_website=""):
             channel.start_consuming()
         except Exception as err:
             print("Error while consuming: ", err)
+            if channel.is_closed():
+                print("Bye!")
+                break
 
 
 if __name__ == "__main__":

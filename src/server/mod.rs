@@ -194,7 +194,7 @@ impl<'a> ServerMethods<'a> for Server<'a> {
                 };
                 // info!("analysis results: {:?}", res);
                 // consumer.
-                thread::sleep(time::Duration::from_secs(5));
+                thread::sleep(time::Duration::from_secs(1));
             }
         });
 
