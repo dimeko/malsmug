@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use log::info;
 use env_logger::Builder;
-use colored::Colorize;
 
 // mod analyzer;
 // mod sast;
@@ -14,14 +13,17 @@ mod server;
 
 use server::ServerMethods;
 
-const DEFAULT_URL_TO_VISIT: &'static str = "https://google.com";
+// const DEFAULT_URL_TO_VISIT: &'static str = "https://google.com";
 const SERVER_ADDRESS: &'static str = "127.0.0.1:11234";
+
 #[derive(Parser)]
 struct Args {
-    #[command(subcommand)]
-    command: CliCommand,
+    // #[command(subcommand)]
+    // command: CliCommand,
     #[clap(long)]
-    file_path: PathBuf,
+    bindhost: String,
+    #[clap(long)]
+    bindport: u16,
     #[clap(
         long,
         short,
@@ -38,18 +40,18 @@ struct Args {
     debug: bool
 }
 
-#[derive(Subcommand, Debug)]
-enum CliCommand {
-    All {
-        #[clap(long, default_value(DEFAULT_URL_TO_VISIT))]
-        url_to_visit: String
-    },
-    Sast {},
-    Dast {
-        #[clap(long, default_value(DEFAULT_URL_TO_VISIT))]
-        url_to_visit: String
-    },
-}
+// #[derive(Subcommand, Debug)]
+// enum CliCommand {
+//     All {
+//         #[clap(long, default_value(DEFAULT_URL_TO_VISIT))]
+//         url_to_visit: String
+//     },
+//     Sast {},
+//     Dast {
+//         #[clap(long, default_value(DEFAULT_URL_TO_VISIT))]
+//         url_to_visit: String
+//     },
+// }
 
 // fn run_sast(file_path: PathBuf) {
 //     info!("starting static analyzer");
@@ -81,23 +83,25 @@ enum CliCommand {
 async fn main() {
     let mut builder = Builder::from_default_env();
 
-    let log_level: log::LevelFilter = log::LevelFilter::Debug;
-    // let cli_args = Args::parse();
+    let mut log_level: log::LevelFilter = log::LevelFilter::Debug;
+    let cli_args = Args::parse();
 
-    // if cli_args.verbose {
-    //     log_level = log::LevelFilter::Info;
-    // }
+    if cli_args.verbose {
+        log_level = log::LevelFilter::Info;
+    }
 
-    // if cli_args.debug {
-    //     log_level = log::LevelFilter::Debug;
-    // }
+    if cli_args.debug {
+        log_level = log::LevelFilter::Debug;
+    }
 
     builder
         .filter(None, log_level)
         .init();
 
-    info!("running server on {}", SERVER_ADDRESS);
-    let s = server::Server::new(SERVER_ADDRESS).await;
+    let server_address= cli_args.bindhost + &cli_args.bindport.to_string();
+
+    info!("running server on {}", server_address);
+    let s = server::Server::new(&server_address).await;
     let _ = s.start().await;
 
     // info!("analyzing file: {}", &cli_args.file_path.to_str().unwrap());

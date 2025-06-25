@@ -25,5 +25,6 @@ uuid = {version = "1.17.0", features = ["v4"]}
 sqlx = {version = "0.8.6", features = ["runtime-tokio-native-tls", "sqlite"]}
 libsqlite3-sys = "=0.30.1"
 async-trait = "0.1.88"
+saphyr = "0.0.6"
 # sqlx = { version = "=0.8.6", features = ["runtime-tokio-native-tls", "sqlite", "chrono"]}
 # libsqlite3-sys = "0.34.0"
