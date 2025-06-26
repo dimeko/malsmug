@@ -12,7 +12,7 @@ colored = "3.0.0"
 env_logger = "0.11.7"
 log = "0.4.27"
 multipart = {version = "0.18.0", features = ["client"]}
-oxc = { version = "0.61.2", features = ["ast_visit", "serialize"] }
+oxc = { version = "0.75.0", features = ["ast_visit", "serialize"] }
 publicsuffix = "2.3.0"
 regex = "1.11.1"
 reqwest = {version = "0.12.15", features = ["blocking", "json"]}
@@ -28,5 +28,8 @@ saphyr = "0.0.6"
 yaml-rust2 = "0.10.3"
 serde_yaml = "0.9.34"
 lapin = "3.0.0"
+rmp = "0.8.14"
+rmp-serde = "1.3.0"
+sha256 = "1.6.0"
 # sqlx = { version = "=0.8.6", features = ["runtime-tokio-native-tls", "sqlite", "chrono"]}
 # libsqlite3-sys = "0.34.0"

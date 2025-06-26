@@ -12,7 +12,7 @@ pub fn contains_html_like_code(input: &str) -> bool {
 pub fn parse_yaml<T: for<'a> Deserialize<'a>>(p: PathBuf) -> Result<T, Error> {
     let mut f = fs::File::open(p).unwrap();
     let mut buf: String = String::new();
-    f.read_to_string(&mut buf);
+    let _ = f.read_to_string(&mut buf); // TODO: handle error
     let parsed_yaml: T = match serde_yaml::from_str(&buf) {
         Ok(p) => {
             p

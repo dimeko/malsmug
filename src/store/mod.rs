@@ -6,19 +6,41 @@ use models::FileAnalysisReport;
 use sqlx::{migrate::MigrateDatabase, Error, Sqlite};
 
 const DATABASE_URL: &str = "sqlite:/home/dimeko/dev/malsmug/malsmug.db";
+
+pub trait FileAnalysisReportStoreTraitClone {
+    fn clone_box(&self) -> Box<dyn FileAnalysisReportStoreTrait>;
+}
+
+impl<T> FileAnalysisReportStoreTraitClone for T
+where
+    T: 'static + FileAnalysisReportStoreTrait + Clone,
+{
+    fn clone_box(&self) -> Box<dyn FileAnalysisReportStoreTrait> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn FileAnalysisReportStoreTrait> {
+    fn clone(&self) -> Box<dyn FileAnalysisReportStoreTrait> {
+        self.clone_box()
+    }
+}
 #[async_trait]
-pub trait FileAnalysisReportStoreTrait: Send + Sync {
+pub trait FileAnalysisReportStoreTrait: Send + Sync + FileAnalysisReportStoreTraitClone {
     async fn create_file_report(&self, report: FileAnalysisReport) -> anyhow::Result<()>;
+    async fn get_file_report_by_file_hash(&self, hash: &str) -> Option<FileAnalysisReport>;
     async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport>;
 }
 
-struct DB {
-    file_analysis_report: Box<dyn FileAnalysisReportStoreTrait>
+#[derive(Clone)]
+pub struct DB {
+    pub file_analysis_report: Box<dyn FileAnalysisReportStoreTrait>
 }
 
+#[derive(Clone)]
 pub struct Store {
-    driver: String,
-    db: DB
+    pub driver: String,
+    pub db: DB
 }
 
 impl Store {

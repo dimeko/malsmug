@@ -1,5 +1,8 @@
 
 use std::{sync::Arc, time::{self}};
+use async_std::stream::StreamExt;
+use lapin::options::BasicAckOptions;
+use serde::Serialize;
 use tokio::task;
 use axum::{
     extract::Multipart,
@@ -10,24 +13,21 @@ use axum::{
     Json,
     Router
 };
+use rmp_serde::Serializer;
 use std::thread;
-use log::{debug, info};
-
-use serde::{Deserialize, Serialize};
+use log::{debug, error, info, warn};
+use sha256;
 
 pub mod rabbitclient;
+pub mod types;
 
-use crate::{store};
+use crate::store::{self, models::FileAnalysisReport};
 use store::Store;
 
 #[derive(Clone)]
 struct ApiContext {
+    store: Arc<Store>,
     queue: Arc<dyn 'static + Send + rabbitclient::Queue>
-}
-
-#[derive(Deserialize, Serialize)]
-struct Response {
-    msg: String,
 }
 
 pub trait ServerMethods<'a> {
@@ -59,7 +59,7 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
     while let Some(field) = match multipart.next_field().await {
         Ok(f) => f,
         Err(err) => {
-            return (StatusCode::BAD_REQUEST, Json(Response { msg: format!("Error reading multipart field: {:?}", err) }))
+            return (StatusCode::BAD_REQUEST, Json(types::Response { msg: format!("Error reading multipart field: {:?}", err) }))
         }
     } {
         let field_name = field.name().unwrap_or_default().to_string();
@@ -73,40 +73,86 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
         }
     }
 
+    let file_hash_from_bytes = sha256::digest(&total_file_bytes).to_string();
+
+    // save report reference to database
+    match ctx.store.db.file_analysis_report.create_file_report(FileAnalysisReport::new(
+        file_name.clone(),
+        file_hash_from_bytes.clone(),
+        file_name.clone(),
+        false,
+        0, "".to_string())).await {
+            Ok(_) => {
+                info!("file {:?} report saved", file_name.clone());
+            },
+            Err(e) => {
+                error!("file {:?} report was NOT saved. Error: {:?}", file_name.clone(), e);
+                return (StatusCode::BAD_REQUEST, Json(types::Response { msg: "file was not saved".to_string()}))
+            }
+        }
+
+    // prepate the FileForAnalysis details to be sent as byte stream to RBMQ
+    let file_for_analysis = types::FileForAnalysis {
+        file_name: file_name.clone(),
+        file_hash: file_hash_from_bytes,
+        file_bytes: total_file_bytes.clone()
+    };
+
+    let mut file_for_analysis_buf: Vec<u8> = Vec::new();
+
+    // Serialize the FileForAnalysis to byte Vec
+    file_for_analysis.serialize(&mut Serializer::new(&mut file_for_analysis_buf)).unwrap();
+
+    // pulish the data
     let _ = ctx.queue.publish(
         ctx.queue.get_core_files_queue(),
         ctx.queue.get_main_exchange(),
-        total_file_bytes).await;
+        file_for_analysis_buf).await;
 
     info!("file {:?} sent to queue", file_name);
-    (StatusCode::CREATED, Json(Response { msg: "file was submitted".to_string()}))
+    (StatusCode::CREATED, Json(types::Response { msg: "file was submitted".to_string()}))
 }
 
 impl<'a> ServerMethods<'a> for Server<'a> {
     // async 
     async fn start(&self) -> anyhow::Result<()> {
         let inner_queue = self.queue.clone();
+        // let inner_store = self.store.clone();
         let app = Router::new()
             .route("/upload_file", post(upload_file))
             .route_layer(
                 Extension(ApiContext {
+                    store: Arc::from(self.store.clone()),
                     queue: inner_queue.clone(),
                 })
             );
 
         let _ = task::spawn(async move {
-            // loop {
-                info!("polling results");
-                inner_queue.consume(
-                    inner_queue.get_sandbox_iocs_queue(),
-                    |data: Vec<u8>| {
-                        info!("data: {:?}", data[0]);
-                    }).await;
-                // info!("analysis results: {:?}", res);
-                // consumer.
+                match inner_queue.consume(
+                    inner_queue.get_sandbox_iocs_queue()).await {
+                        Ok(mut c) => {
+                            while let Some(delivery) = c.next().await {
+                                match delivery {
+                                    Ok(d) => {
+                                        info!("data arrived from: {:?}", d.exchange);
+                                        let ack_args = BasicAckOptions {
+                                            multiple: false
+                                        };
+                                        let _ = d.ack(ack_args).await;
+                                    },
+                                    Err(e) => {
+                                        error!("could not get data: {:?}", e);
+                                    }
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            error!("could not create consumer: {:?}", e);
+                        }
+                    };
+                warn!("reached the end of the stream. Probably we should never reach here.");
                 thread::sleep(time::Duration::from_secs(1));
-            // }
-        });
+            });
 
         // run our app with hyper, listening globally on port 3000
         let listener = tokio::net::TcpListener::bind(self.bindhost).await.unwrap();

@@ -7,8 +7,8 @@ import { RBMQ } from "./rbmq";
 import rsg from "random-string-generator";
 
 const RABBITMQ_MALSMUG_ANALYSIS_EXCHANGE = "malsmug.analysis"
-const RABBITMQ_FILES_QUEUE = "malsmug.files_queue"
-const RABBITMQ_REPORTS_QUEUE = "malsmug.reports_queue"
+const RABBITMQ_FILES_QUEUE = "malsmug.files_for_analysis"
+const RABBITMQ_REPORTS_QUEUE = "malsmug.analysis_iocs"
 
 
 // const urlToVisit = "https://facebook.com";
@@ -109,7 +109,6 @@ if (!fs.existsSync(sampleFile)) {
     // });
     const place_hooks_source_code = place_hooks.toString();
 
-
     try {
         let place_hooks_wrapper = `
             ${place_hooks_source_code}
@@ -139,7 +138,7 @@ if (!fs.existsSync(sampleFile)) {
         } else {
             console.log("[analysis-error] Unknown error: ", err);
         }
-        await rbmqc.publish(RABBITMQ_REPORTS_QUEUE, "noooooooooooooo")
+        await rbmqc.publish(RABBITMQ_REPORTS_QUEUE, `error analysing sample: ${err}`)
         await page.close();
     }
         // })
