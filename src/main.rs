@@ -8,11 +8,11 @@ use env_logger::Builder;
 // mod dast_event_types;
 mod store;
 mod utils;
-mod server;
+mod app;
 mod bootstrap;
 
-use server::ServerMethods;
-use server::rabbitclient;
+use app::ServerMethods;
+use app::rabbitclient;
 
 #[derive(Parser)]
 struct Args {
@@ -110,7 +110,7 @@ async fn main() {
         "rpassword".to_string(),
         rabbitclient::RabbitMQConfig::new(rbmq_conf_from_file)
     ).await;
-    let s = server::Server::new(&server_address, Box::new(rbmqc)).await;
+    let s = app::Server::new(&server_address, Box::new(rbmqc)).await;
 
     let _ = s.start().await;
 

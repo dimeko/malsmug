@@ -136,27 +136,15 @@ impl<'a> Visit<'a> for Scanner<'a> {
 }
 
 pub struct SastAnalyzer {
-    source_text: String,
-    file_path: PathBuf,
+    source_bytes: Vec<u8>,
     findings: Vec<analyzer::Finding>
 }
 
 impl SastAnalyzer {
-    pub fn new(file_path: PathBuf) -> Self {
-        let mut _f = match File::open(&file_path) {
-            Ok(_f) => _f,
-            Err(_e) => {
-                error!("error opening {}: {}", file_path.to_string_lossy(), _e);
-                std::process::exit(1)
-            }
-        };
-
-        let mut _str_from_file = String::new();
-        let _string = _f.read_to_string(&mut _str_from_file).unwrap();
+    pub fn new(source_bytes: Vec<u8>) -> Self {
 
         SastAnalyzer {
-            file_path,
-            source_text: _str_from_file,
+            source_bytes,
             findings: Vec::new()
         }
     }
