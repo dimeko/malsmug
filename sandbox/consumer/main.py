@@ -43,13 +43,13 @@ def run(samples_dir="", sandbox_lib="", bait_website=""):
     )
     connection = BlockingConnection(conn_params)
     channel = connection.channel()
-    channel.queue_declare(queue="malsmug.files_queue", durable=True, auto_delete=True)
-    channel.queue_bind(exchange='malsmug.analysis', queue='malsmug.files_queue', routing_key='malsmug.files_queue')
+    channel.queue_declare(queue="malsmug.files_for_analysis", durable=True, auto_delete=True)
+    channel.queue_bind(exchange='malsmug.analysis', queue='malsmug.files_for_analysis', routing_key='malsmug.files_for_analysis')
     print("start consuming from RabbitMQ")
     while True:
         try:
             channel.basic_qos(prefetch_count=1)
-            channel.basic_consume(queue='malsmug.files_queue', on_message_callback=on_message)
+            channel.basic_consume(queue='malsmug.files_for_analysis', on_message_callback=on_message)
             channel.start_consuming()
         except Exception as err:
             print("Error while consuming: ", err)

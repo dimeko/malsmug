@@ -4,7 +4,7 @@
 /whatever/
 findings.md
 /sandbox/dist/
-malsmug.db
+malsmug.db*
 .sqlx
 notes.txt
 **venv

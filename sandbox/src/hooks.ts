@@ -70,8 +70,7 @@ function place_hooks(reportFnName: string) {
                     callee: "window.localStorage.setItem",
                     arguments: [key, value]
                 } as EventFunctionCall
-            }
-            ;
+            };
             (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
 
             return originalSetItem.apply(this, [key, value] as [key: string, value: string]);
@@ -200,7 +199,7 @@ function place_hooks(reportFnName: string) {
                         cookie: originalCookies,
                     } as EventGetCookie
                 };
-            (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
+                (window[reportFnName as keyof typeof window] as (event: Event) => void)(_event)
 
                 return originalCookies;
             },

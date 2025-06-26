@@ -3,7 +3,6 @@ pub mod models;
 use async_trait::async_trait;
 use log::info;
 use models::FileAnalysisReport;
-use sqlite::FileAnalysisReportStore;
 use sqlx::{migrate::MigrateDatabase, Error, Sqlite};
 
 const DATABASE_URL: &str = "sqlite:/home/dimeko/dev/malsmug/malsmug.db";
@@ -13,13 +12,13 @@ pub trait FileAnalysisReportStoreTrait: Send + Sync {
     async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport>;
 }
 
-struct Models {
-    file_analysis_report: FileAnalysisReportStore
+struct DB {
+    file_analysis_report: Box<dyn FileAnalysisReportStoreTrait>
 }
 
 pub struct Store {
     driver: String,
-    models: Models
+    db: DB
 }
 
 impl Store {
@@ -38,8 +37,8 @@ impl Store {
                 let pool = sqlx::SqlitePool::connect(DATABASE_URL).await.unwrap();
                 Store {
                     driver: "sqlite".to_string(),
-                    models: Models {
-                        file_analysis_report: FileAnalysisReportStore::new(pool)
+                    db: DB {
+                        file_analysis_report: Box::new(sqlite::FileAnalysisReportStore::new(pool))
                     }
                 }
             },

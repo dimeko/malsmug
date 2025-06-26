@@ -1,8 +1,7 @@
 use std::path::PathBuf;
-use clap::{Parser, Subcommand};
+use clap::{Parser};
 use log::info;
 use env_logger::Builder;
-
 // mod analyzer;
 // mod sast;
 // mod dast;
@@ -10,11 +9,10 @@ use env_logger::Builder;
 mod store;
 mod utils;
 mod server;
+mod bootstrap;
 
 use server::ServerMethods;
-
-// const DEFAULT_URL_TO_VISIT: &'static str = "https://google.com";
-const SERVER_ADDRESS: &'static str = "127.0.0.1:11234";
+use server::rabbitclient;
 
 #[derive(Parser)]
 struct Args {
@@ -98,10 +96,22 @@ async fn main() {
         .filter(None, log_level)
         .init();
 
-    let server_address= cli_args.bindhost + &cli_args.bindport.to_string();
+    let server_address= cli_args.bindhost + ":" + &cli_args.bindport.to_string();
+
+    let rbmq_conf_from_file = utils::parse_yaml::
+        <bootstrap::rabbitmq_conf::RabbitMQExtConf>(PathBuf::from("./config/rabbitmq.yaml")).unwrap(); 
 
     info!("running server on {}", server_address);
-    let s = server::Server::new(&server_address).await;
+
+    let rbmqc = rabbitclient::RabbitMQ::new(
+        "127.0.0.1".to_string(),
+        5672,
+        "ruser".to_string(),
+        "rpassword".to_string(),
+        rabbitclient::RabbitMQConfig::new(rbmq_conf_from_file)
+    ).await;
+    let s = server::Server::new(&server_address, Box::new(rbmqc)).await;
+
     let _ = s.start().await;
 
     // info!("analyzing file: {}", &cli_args.file_path.to_str().unwrap());

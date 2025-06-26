@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-amqprs = "2.1.2"
 anyhow = "1.0.98"
 async-std = { version = "1.13.1", features = ["tokio1"] }
 axum = {version = "0.8.4", features = ["multipart"]}
@@ -26,5 +25,8 @@ sqlx = {version = "0.8.6", features = ["runtime-tokio-native-tls", "sqlite"]}
 libsqlite3-sys = "=0.30.1"
 async-trait = "0.1.88"
 saphyr = "0.0.6"
+yaml-rust2 = "0.10.3"
+serde_yaml = "0.9.34"
+lapin = "3.0.0"
 # sqlx = { version = "=0.8.6", features = ["runtime-tokio-native-tls", "sqlite", "chrono"]}
 # libsqlite3-sys = "0.34.0"
