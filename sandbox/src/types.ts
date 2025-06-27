@@ -60,8 +60,7 @@ type Event = {
         EventAddEventListener,
 }
 
-type EvensFromAnalysis = {
-    file_name: string,
+type EventsFromAnalysis = {
     file_hash: string,
     events: Event[]
 }
@@ -77,5 +76,5 @@ export {
     EventHttpResponse, 
     EventConsoleLog, 
     EventAddEventListener,
-    EvensFromAnalysis
+    EventsFromAnalysis
 }

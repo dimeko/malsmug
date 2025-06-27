@@ -5,6 +5,7 @@ import { Lure } from "./lure";
 import { RBMQ } from "./rbmq";
 import * as types from "./types";
 import rsg from "random-string-generator";
+import { sha256 } from 'js-sha256';
 
 const RABBITMQ_MALSMUG_ANALYSIS_EXCHANGE = "malsmug.analysis"
 const RABBITMQ_FILES_QUEUE = "malsmug.files_for_analysis"
@@ -87,11 +88,17 @@ if (!fs.existsSync(sampleFile)) {
         await lure.start_lure()
         console.log(`[analysis-debug] Finishing Lure`);
         setTimeout(async () => { 
-            // await rbmqc.
-            await rbmqc.publish(RABBITMQ_REPORTS_QUEUE, events)
+            let event_for_analysis: types.EventsFromAnalysis = {
+                file_hash: sha256(scriptCode),
+                events: events
+            }
+            await rbmqc.publish(RABBITMQ_REPORTS_QUEUE, event_for_analysis)
+            try {
+                fs.rmSync(sampleFile)
+            } catch(e) {
+                console.log("[analysis-error] Could not remove sample file")
+            }
             await page.close();
-            // console.log("[analysis-debug] Closing browser...");
-            // await browser.close(); 
         }, 1000);
     } catch(err) {
         if (err instanceof SyntaxError) {

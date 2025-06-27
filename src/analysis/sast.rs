@@ -1,16 +1,12 @@
-use std::{collections::HashMap};
-
 use oxc::{ast::ast::{Argument, Expression, Program}, ast_visit::walk::walk_call_expression};
 use oxc::{allocator::Allocator, ast::ast::CallExpression, ast::ast::BinaryExpression};
 use oxc::parser::{
     Parser as JSParser, ParseOptions
 };
-use log::{warn};
-
 use oxc::span::SourceType;
 use oxc::ast_visit::{walk, Visit};
 
-use crate::analysis::analyzer;
+use crate::{analysis::analyzer::{self, Finding}, store::models::FileAnalysisReport};
 use crate::utils;
 
 // creating different struct here in order to be able to create
@@ -136,96 +132,28 @@ impl<'a> Visit<'a> for Scanner {
     }
 }
 
-pub struct SastAnalyzer {
-    file_hash_source_bytes: HashMap<String, Vec<u8>>,
-    file_hash_findings: HashMap<String, Vec<analyzer::Finding>>,
-    file_hash_extensions: HashMap<String, String>,
-}
+pub struct SastAnalyzer {}
 
 impl SastAnalyzer {
     pub fn new() -> Self {
-        SastAnalyzer {
-            file_hash_source_bytes: HashMap::new(),
-            file_hash_findings: HashMap::new(),
-            file_hash_extensions: HashMap::new()
-        }
+        SastAnalyzer {}
     }
 
-    fn add_file(&mut self, file_hash: String, source_bytes: Vec<u8>, extension: String) {
-        self.file_hash_source_bytes
-            .entry(file_hash.clone())
-            .and_modify(|e| { *e = source_bytes.clone() })
-            .or_insert(source_bytes);
-
-        self.file_hash_extensions
-            .entry(file_hash.clone())
-            .and_modify(|e| { *e = extension.clone() })
-            .or_insert(extension);
-    }
-
-    fn scan_ast(&mut self, file_hash: String, ast: Program) -> Option<Vec<StaticAnalysisIoC>> {
-        if self.file_hash_source_bytes.contains_key(file_hash.as_str()) {
-            match self.file_hash_source_bytes.get(file_hash.as_str()) {
-                Some(_s) => {
-                    let mut scanner = Scanner { source: _s.clone(), _interesting_items: Vec::new() };
-                    walk::walk_program::<Scanner>(&mut scanner, &ast);
-                    return Some(scanner._interesting_items);
-                },
-                None => {
-                    warn!("key {:?} does not exist", file_hash);
-                    return None;
-                }
-            }
-        } else {
-            return None;
-        }
-
-    }
-
-    fn get_src_bytes(&self, file_hash: String) -> Option<Vec<u8>> {
-        match self.file_hash_source_bytes.get(file_hash.as_str()) {
-            Some(_s) => {
-                return Some(_s.clone());
-            },
-            None => {
-                warn!("key {:?} does not exist", file_hash);
-                return None;
-            }
-        }
-    }
-
-
-    fn get_file_extension(&self, file_hash: String) -> Option<String> {
-        match self.file_hash_extensions.get(file_hash.as_str()) {
-            Some(_s) => {
-                return Some(_s.clone());
-            },
-            None => {
-                warn!("key {:?} does not exist", file_hash);
-                return None;
-            }
-        }
+    fn scan_ast(&mut self, source_code: Vec<u8>, ast: Program) -> Option<Vec<StaticAnalysisIoC>> {
+        let mut scanner = Scanner { source: source_code, _interesting_items: Vec::new() };
+        walk::walk_program::<Scanner>(&mut scanner, &ast);
+        return Some(scanner._interesting_items);
     }
 }
 
-impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
-    fn analyze(&mut self, file_hash: String) -> Result<bool, String> {
+impl<'a> analyzer::SastAnalyze<'a> for SastAnalyzer {
+    fn analyze(&mut self, file_report: FileAnalysisReport, source_code: Vec<u8>) -> Result<Vec<Finding>, String> {
         // analysis parameters preparation
-        let extension = match self.get_file_extension(file_hash.clone()) {
-            Some(s) => s,
-            None => {
-                return Err(format!("source code for {:?} does not exist", file_hash));
-            }
-        };
-        let source_type: SourceType = SourceType::from_extension(extension.as_str()).unwrap();
+        let mut findings: Vec<Finding> = Vec::new();
+        let source_type: SourceType = SourceType::from_extension(&file_report.file_extension.as_str()).unwrap();
         let allocator = Allocator::default();
-        let binding = match self.get_src_bytes(file_hash.clone()) {
-            Some(s) => s,
-            None => {
-                return Err(format!("source code for {:?} does not exist", file_hash));
-            }
-        };
-         let binding_vec = binding.to_vec();
+
+         let binding_vec = source_code.to_vec();
          let _src_str = match str::from_utf8(&binding_vec) {
             Ok(v) => v,
             Err(e) => {
@@ -239,7 +167,7 @@ impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
         // static analysis steps
 
         // analyse the Abstract Syntax Tree (for now)
-        let _interesting_findings_iter = &mut self.scan_ast(file_hash.clone(), js_file_ast.program).unwrap();
+        let _interesting_findings_iter = &mut self.scan_ast(source_code, js_file_ast.program).unwrap();
         let mut _interesting_findings: Vec<analyzer::Finding> = _interesting_findings_iter.iter().map(|_it| {
             return analyzer::Finding {
                 poc: _it.poc.clone(),
@@ -247,24 +175,11 @@ impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
                 title: _it.title.to_string()
             }
         }).collect();
-        self.file_hash_findings.entry(file_hash.clone().to_string())
-            .or_insert(_interesting_findings.clone())
-            .append(&mut _interesting_findings);
+        findings.append(&mut _interesting_findings);
         // self.findings.append(_interesting_findings);
         // ...
         // end of analysis
         // ---------------------------------------------------
-        return Ok(true);
-    }
-
-    fn get_findings(&self, file_hash: String) -> Option<&Vec<analyzer::Finding>> {
-        match self.file_hash_findings.get(file_hash.as_str()) {
-            Some(f) => {
-                return Some(f);
-            },
-            None => {
-                return None
-            }
-        }
+        return Ok(findings);
     }
 }

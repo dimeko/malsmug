@@ -1,4 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct FileAnalysisReport {
     pub uid: Option<String>,
     pub name: String,
@@ -28,5 +31,18 @@ impl FileAnalysisReport {
             analysis_report,
             uid: None
           }  
+    }
+
+    pub fn copy_no_uid(&self) -> FileAnalysisReport {
+        FileAnalysisReport {
+          uid: None,
+          name: self.name.clone(),
+          file_hash: self.file_hash.clone(),
+          file_name: self.file_name.clone(),
+          file_extension: self.file_extension.clone(),
+          has_been_analysed: self.has_been_analysed.clone(),
+          severity: self.severity.clone(),
+          analysis_report: self.analysis_report.clone() 
+      }
     }
 }

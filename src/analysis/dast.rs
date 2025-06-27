@@ -1,7 +1,5 @@
-use std::fmt::Error;
 use std::io::Read;
 use std::fs::File;
-use axum::response::sse::Event;
 use serde::Deserialize;
 use serde_json::Value;
 use log::{error, warn, debug, info};
@@ -12,6 +10,7 @@ use publicsuffix::{Psl, List};
 use std::str;
 
 use crate::analysis::analyzer::Finding;
+use crate::store::models::FileAnalysisReport;
 use crate::utils;
 use crate::analysis::analyzer;
 use crate::analysis::dast_event_types;
@@ -66,16 +65,14 @@ struct SpamHausResponse {
 #[derive(Clone)]
 pub struct DastAnalyzer {
     cached_domain_reputations: HashMap<String, f32>,
-    file_hash_events: HashMap<String, Vec<dast_event_types::Event>>,
-    file_hash_findings: HashMap<String, Vec<Finding>>,
+    // file_hash_events:  Vec<dast_event_types::Event>,
+    // file_hash_findings: Vec<Finding>,
 }
 
 impl DastAnalyzer {
     pub fn new() -> Self {
         DastAnalyzer { 
             cached_domain_reputations: HashMap::new(),
-            file_hash_events: HashMap::new(),
-            file_hash_findings: HashMap::new()
         }
     }
 
@@ -190,52 +187,26 @@ impl DastAnalyzer {
             }
         }
     }
-
-    fn load_events(&mut self, file_hash: String, events: Vec<dast_event_types::Event>) {
-        self.file_hash_events
-            .entry(file_hash.clone())
-            .and_modify(|e| { *e = events.clone() })
-            .or_insert(events);
-    }
-
-    fn get_events(&self, file_hash: String) -> Result<Vec<dast_event_types::Event>, String> {
-        if self.file_hash_events.contains_key(file_hash.as_str()) {
-            match self.file_hash_events.get(file_hash.as_str()) {
-                Some(_s) => {
-                    return Ok(_s.clone());
-                },
-                None => {
-                    return Err(format!("key {:?} does not exist", file_hash));
-                }
-            }
-        } else {
-            return Err(format!("key {:?} does not exist", file_hash));
-        }
-    }
 }
 
-impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
-    fn analyze(&mut self, file_hash: String) -> Result<bool, String> {
-        if !self.file_hash_events.contains_key(file_hash.as_str()){
-            return Err("invalid file hash".to_string());
-        }
+impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
+    fn analyze(&mut self, _: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String> {
         // ---------------------------------------------------
-        // dynamic analysis steps
+        // dynamic analysis
         //
         // parse and examine every line of the stdout
         // this is a simple method at the moment.  In future versions
         // we can send events in and out of the sandbox by running a server
         // on the host
-        let immutable_self = self.clone();
+        let mut findings: Vec<Finding> = Vec::new();
 
-        for event in immutable_self.file_hash_events.get(file_hash.clone().as_str()).unwrap() {
+        for event in events {
             match event.clone().value {
                 dast_event_types::EventValue::EventHttpRequest(_v) => {
                     // analysis: check response url domain reputation
                     let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
                     if _score <= 20.0 && _score > 0.0 {
-                        self.file_hash_findings.entry(file_hash.clone().to_string())
-                            .or_insert_with(|| Vec::new()).push(
+                        findings.push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::High,
                                     poc: _v.url,
@@ -246,7 +217,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                     // analysis: check for user input sent in request
                     // "fake_input_from_sandbox_" is the default input prefix that the sandbox puts inside the input fields 
                     if _v.data.contains("fake_input_from_sandbox_") {
-                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                        findings.push(
                             analyzer::Finding { 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.data,
@@ -258,7 +229,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                     // analysis: check response url domain reputation
                     let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
                     if _score <= 20.0 && _score > 0.0 {
-                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                        findings.push(
                             analyzer::Finding { 
                                 severity: analyzer::Severity::High,
                                 poc: _v.url,
@@ -270,7 +241,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                 dast_event_types::EventValue::EventNewHtmlElement(_v) => {
                     // analysis: check if the target creates new html elements that can potentially access the internet
                     if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
-                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                        findings.push(
                             analyzer::Finding { 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.element_type,
@@ -282,7 +253,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                     // analysis: check document.write call with the first argument being an html-like element
                     if matches!(_v.callee.as_str(), "document.write") && _v.arguments.len() > 0 {
                         if utils::contains_html_like_code(_v.arguments[0].as_str()) {
-                            self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                            findings.push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: _v.callee,
@@ -293,7 +264,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                         // analysis: check window.eval call
                         // here we could also check whether the eval paramater is actually a malicious Javascript code
                         // for now we check just the dangerous call to `.eval`
-                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                        findings.push(
                                 analyzer::Finding { 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
@@ -301,7 +272,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                             });
                     } else if matches!(_v.callee.as_str(), "window.execScript") {
                         // analysis: check window.execScript call
-                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                        findings.push(
                             analyzer::Finding { 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
@@ -310,7 +281,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                     } else if matches!(_v.callee.as_str(), "window.localStorage.getItem")  && _v.arguments.len() > 0 {
                         // analysis: check whether the target tries to access sinsitive data keys
                         if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.arguments[0].as_str()) {
-                            self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                            findings.push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: format!("{}({})", _v.callee, &_v.arguments[0].as_str()),
@@ -321,7 +292,7 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
                 },
                 dast_event_types::EventValue::EventGetCookie(_v) => {
                     if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.cookie.as_str()) {
-                            self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                            findings.push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: "document.cookie".to_string(),
@@ -339,17 +310,6 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         }
         // end of analysis
         // ---------------------------------------------------
-        Ok(true)
-    }
-
-    fn get_findings(&self, file_hash: String) -> Option<&Vec<analyzer::Finding>> {
-        match self.file_hash_findings.get(file_hash.as_str()) {
-            Some(f) => {
-                return Some(f);
-            },
-            None => {
-                return None
-            }
-        }
+        Ok(findings.clone())
     }
 }

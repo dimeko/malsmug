@@ -30,6 +30,7 @@ pub trait FileAnalysisReportStoreTrait: Send + Sync + FileAnalysisReportStoreTra
     async fn create_file_report(&self, report: FileAnalysisReport) -> anyhow::Result<()>;
     async fn get_file_report_by_file_hash(&self, hash: &str) -> Option<FileAnalysisReport>;
     async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport>;
+    async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> anyhow::Result<()>;
 }
 
 #[derive(Clone)]

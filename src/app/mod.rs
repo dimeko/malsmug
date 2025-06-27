@@ -2,20 +2,18 @@
 use std::{sync::Arc, time::{self}};
 use async_std::stream::StreamExt;
 use lapin::options::BasicAckOptions;
-use serde::Serialize;
 use tokio::task;
 use axum::{
-    extract::Multipart,
+    extract::{Multipart, Path},
     http::StatusCode,
     response::IntoResponse,
-    routing::{post},
+    routing::{post, get},
     Extension,
     Json,
     Router
 };
-use std::path::Path;
-use std::ffi::OsStr;
 use rmp_serde::Serializer;
+use serde::{Serialize};
 use std::thread;
 use log::{debug, error, info, warn};
 use sha256;
@@ -23,7 +21,13 @@ use sha256;
 pub mod rabbitclient;
 pub mod types;
 
-use crate::{store::{self, models::FileAnalysisReport}, utils};
+use crate::{
+    analysis::{
+        analyzer::{DastAnalyze, Severity},dast::DastAnalyzer},
+    app::types::EventsFromAnalysis,
+    store::{self, models::FileAnalysisReport},
+    utils
+};
 use store::Store;
 
 #[derive(Clone)]
@@ -54,6 +58,31 @@ impl<'a> Server<'a> {
     }
 }
 
+async fn get_file_report(Extension(ctx): Extension<ApiContext>, Path(file_hash): Path<String>) -> impl IntoResponse {
+    let r = match ctx.store.db.file_analysis_report.get_file_report_by_file_hash(file_hash.as_str()).await {
+            Some(r) => {
+                (StatusCode::CREATED, Json(
+                    types::Response{
+                            r:  types::Responses::GetFileReport(
+                                    types::GetFileReport {
+                                        file: r.copy_no_uid() // avoid returning uid. Just because we can
+                                    }
+                                )
+                            }
+                        )
+                    )
+            }
+            None => {
+                (StatusCode::NOT_FOUND, Json(types::Response{
+                    r:  types::Responses::GenericErrorResponse (
+                            types::GenericErrorResponse { msg: format!("Error getting file report. File hash does not exist") }
+                        )
+                } ))
+            }
+        };
+    r
+}
+
 async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multipart) -> impl IntoResponse {
     // let mut total_chunks = 0;
     let mut file_name: String = String::new();
@@ -61,7 +90,11 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
     while let Some(field) = match multipart.next_field().await {
         Ok(f) => f,
         Err(err) => {
-            return (StatusCode::BAD_REQUEST, Json(types::Response { msg: format!("Error reading multipart field: {:?}", err) }))
+            return (StatusCode::BAD_REQUEST, Json(types::Response{
+                r:  types::Responses::GenericErrorResponse (
+                        types::GenericErrorResponse { msg: format!("Error reading multipart field: {:?}", err) }
+                    )
+            } ))
         }
     } {
         let field_name = field.name().unwrap_or_default().to_string();
@@ -75,8 +108,10 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
         }
     }
 
+    // let's find the file extension. We need it specifically for othe Static analysis phase
     let file_extension = utils::parse_file_extension_of_file(file_name.clone());
 
+    // calculation of the hash of the file content
     let file_hash_from_bytes = sha256::digest(&total_file_bytes).to_string();
 
     // save report reference to database
@@ -92,14 +127,18 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
             },
             Err(e) => {
                 error!("file {:?} report was NOT saved. Error: {:?}", file_name.clone(), e);
-                return (StatusCode::BAD_REQUEST, Json(types::Response { msg: "file was not saved".to_string()}))
+                return (StatusCode::BAD_REQUEST, Json(types::Response{
+                    r:  types::Responses::GenericErrorResponse (
+                            types::GenericErrorResponse { msg: "File was not saved".to_string() }
+                        )
+                }))
             }
         }
 
     // prepate the FileForAnalysis details to be sent as byte stream to RBMQ
     let file_for_analysis = types::FileForAnalysis {
         file_name: file_name.clone(),
-        file_hash: file_hash_from_bytes,
+        file_hash: file_hash_from_bytes.clone(),
         file_bytes: total_file_bytes.clone()
     };
 
@@ -115,16 +154,27 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
         file_for_analysis_buf).await;
 
     info!("file {:?} sent to queue", file_name);
-    (StatusCode::CREATED, Json(types::Response { msg: "file was submitted".to_string()}))
+    (StatusCode::CREATED, Json(
+        types::Response{
+                r:  types::Responses::FileUploadResponse(
+                        types::FileUploadResponse {
+                            msg: "file was submitted".to_string(),
+                            file_hash: file_hash_from_bytes
+                        }
+                    )
+                }
+            )
+    )
 }
 
 impl<'a> ServerMethods<'a> for Server<'a> {
     // async 
     async fn start(&self) -> anyhow::Result<()> {
         let inner_queue = self.queue.clone();
-        // let inner_store = self.store.clone();
+        let inner_store = self.store.clone();
         let app = Router::new()
-            .route("/upload_file", post(upload_file))
+            .route("/upload-file", post(upload_file))
+            .route("/get-file-report/{file_hash}", get(get_file_report))
             .route_layer(
                 Extension(ApiContext {
                     store: Arc::from(self.store.clone()),
@@ -136,14 +186,83 @@ impl<'a> ServerMethods<'a> for Server<'a> {
                 match inner_queue.consume(
                     inner_queue.get_sandbox_iocs_queue()).await {
                         Ok(mut c) => {
+                            let mut dynamic_analyser = DastAnalyzer::new();
                             while let Some(delivery) = c.next().await {
                                 match delivery {
                                     Ok(d) => {
-                                        info!("data arrived from: {:?}", d.exchange);
+                                        debug!("data arrived from: {:?}", d.exchange);
                                         let ack_args = BasicAckOptions {
                                             multiple: false
                                         };
                                         let _ = d.ack(ack_args).await;
+
+                                        // from bytes to string (json string)
+                                        let data_string = match str::from_utf8(&d.data) {
+                                            Ok(r) => {
+                                                debug!("data parsed: {:?}", &r);
+                                                r
+                                            },
+                                            Err(e) => {
+                                                error!("could not parse data from queue: {:?}", e);
+                                                continue;
+                                            }
+                                        };
+
+                                        // from json string to struct
+                                        let events_for_analysis: EventsFromAnalysis = match serde_json::from_str(data_string) {
+                                            Ok(r) => r,
+                                            Err(e) => {
+                                                error!("could not parse json string from queue: {:?}", e);
+                                                continue;
+                                            }
+                                        };
+
+                                        // get file report stored in database on file upload
+                                        let mut file_report = match inner_store.db
+                                            .file_analysis_report
+                                            .get_file_report_by_file_hash(events_for_analysis.file_hash.as_str()).await {
+                                                Some(r) => r,
+                                                None => {
+                                                    error!("report does not exist in database, aborting");
+                                                    continue;
+                                                }
+                                            };
+
+                                        // analyze!
+                                        match dynamic_analyser.analyze(file_report.clone(), events_for_analysis.events) {
+                                            Ok(r) => {
+                                                info!("found {} findings", r.len());
+                                                file_report.has_been_analysed = true;
+                                                let mut max_severity = Severity::Low;
+                                                for f in r.clone() {
+                                                    info!("finding: {:?}, {}", f.title, f.severity);
+                                                    if f.severity > max_severity {
+                                                        max_severity = f.severity;
+                                                    }
+                                                }
+                                                let file_report_uid = file_report.uid.clone().unwrap();
+
+                                                file_report.severity = max_severity as i64;
+                                                file_report.analysis_report = serde_json::to_string(&r).unwrap();
+                                                match inner_store.db.file_analysis_report.update_file_report(
+                                                    file_report_uid.as_str(), 
+                                                    file_report).await {
+                                                        Ok(r) => {
+                                                            debug!("file report was updated successfully: {:?}", r);
+                                                        },
+                                                        Err(e) => {
+                                                            error!(
+                                                                "could not update analysed file db record: {:?}. Error: {:?}",
+                                                                file_report_uid, e);
+                                                        }
+                                                    }
+                                            },
+                                            Err(e) => {
+                                                error!("error occured analysing file {:?}, Error: {:?}", file_report.file_name, e);
+                                                continue;
+                                            }
+                                        };
+
                                     },
                                     Err(e) => {
                                         error!("could not get data: {:?}", e);

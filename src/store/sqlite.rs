@@ -30,7 +30,7 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 FROM file_analysis_reports WHERE uid = ?"#, uid)
             .fetch_one(&self.pool)
             .await.ok();
-            report 
+            report
     }
 
     async fn get_file_report_by_file_hash(&self, hash: &str) -> Option<FileAnalysisReport> {
@@ -47,6 +47,20 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
             .fetch_one(&self.pool)
             .await.ok();
             report 
+    }
+
+    async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> anyhow::Result<()> {
+        sqlx::query!(r#"UPDATE file_analysis_reports
+                    SET has_been_analysed = ?, severity = ?, analysis_report = ? WHERE uid = ? 
+                "#,
+                updated_file_analysis_report.has_been_analysed,
+                updated_file_analysis_report.severity,
+                updated_file_analysis_report.analysis_report,
+                uid
+            )
+            .fetch_one(&self.pool)
+            .await.ok();
+        Ok(())
     }
 
     async fn create_file_report(&self, mut report: FileAnalysisReport) -> anyhow::Result<()> {
