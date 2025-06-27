@@ -13,6 +13,8 @@ use axum::{
     Json,
     Router
 };
+use std::path::Path;
+use std::ffi::OsStr;
 use rmp_serde::Serializer;
 use std::thread;
 use log::{debug, error, info, warn};
@@ -21,7 +23,7 @@ use sha256;
 pub mod rabbitclient;
 pub mod types;
 
-use crate::store::{self, models::FileAnalysisReport};
+use crate::{store::{self, models::FileAnalysisReport}, utils};
 use store::Store;
 
 #[derive(Clone)]
@@ -73,6 +75,8 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
         }
     }
 
+    let file_extension = utils::parse_file_extension_of_file(file_name.clone());
+
     let file_hash_from_bytes = sha256::digest(&total_file_bytes).to_string();
 
     // save report reference to database
@@ -80,6 +84,7 @@ async fn upload_file(Extension(ctx): Extension<ApiContext>, mut multipart: Multi
         file_name.clone(),
         file_hash_from_bytes.clone(),
         file_name.clone(),
+        file_extension,
         false,
         0, "".to_string())).await {
             Ok(_) => {

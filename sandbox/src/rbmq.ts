@@ -6,13 +6,8 @@ class RBMQ {
     private conn: amqplib.ChannelModel | null
     private channel: amqplib.Channel | null
 
-    // private exhange_name: string
-    // private routing_key: string
     constructor(h: string, en: string, rk: string) {
         this.host = h
-        // this.exhange_name = en;
-        // this.routing_key = rk;
-
         this.conn = null
         this.channel = null
     }
@@ -35,10 +30,11 @@ class RBMQ {
         this.channel = await this.conn.createChannel();
     }
 
-    async publish(queue: string, message: any) {
+    async publish(queue: string, msg: any) {
         if(this.channel == null) return null
         await this.channel.assertQueue(queue, { durable: true, autoDelete: true });
-        this.channel.sendToQueue(queue, Buffer.from("testing the sending bufefer"));
+        let json_data: string = JSON.stringify(msg)
+        this.channel.sendToQueue(queue, Buffer.from(json_data));
     }
 
     async consume(queue: string, cb: (bytesAsString: Buffer<ArrayBufferLike>) => void) {
@@ -53,14 +49,6 @@ class RBMQ {
         }).catch((err) => {
             console.log("[analysis-debug] Got error from queue: ", err)
         })
-        // await this.channel.consume(
-        //     queue,
-        //     async (msg) => {
-        //         if(msg == null) return;
-        //         await cb(msg.content)
-        //     },
-            
-        // )
     } 
 }
 

@@ -1,9 +1,9 @@
 import puppeteer from "puppeteer";
 import fs from "fs";
-import { place_hooks, EventType, EventConsoleLog, EventHttpResponse, Event } from "./hooks";
+import { place_hooks } from "./hooks";
 import { Lure } from "./lure";
 import { RBMQ } from "./rbmq";
-
+import * as types from "./types";
 import rsg from "random-string-generator";
 
 const RABBITMQ_MALSMUG_ANALYSIS_EXCHANGE = "malsmug.analysis"
@@ -13,7 +13,6 @@ const RABBITMQ_REPORTS_QUEUE = "malsmug.analysis_iocs"
 
 // const urlToVisit = "https://facebook.com";
 const args = process.argv;
-
 
 var sampleFile = args[2]
 var baitWebsite = args[3]
@@ -56,57 +55,19 @@ if (!fs.existsSync(sampleFile)) {
     console.log("[analysis-debug] Hooking JavaScript APIs...");
 
     page.on('console', message => {
-            // if(!message.text().startsWith("[dom-console]")) {
-                // let _event: Event = {
-                //     type: EventType.ConsoleLog,
-                //     value: {
-                //         text: message.text()
-                //     } as EventConsoleLog
-                // }
                 console.log(`[dom-console]: ${message.text()}`);
-            // } else {
-            //     console.log(`${message.text()}`)
-            // }
         })
-    //     .on('response', response => {
-    //             response.json().then((_r) => {
-    //                 let _event: Event = {
-    //                     type: EventType.HttpResposne,
-    //                     value: {
-    //                         url: response.url(),
-    //                         status: String(response.status()),
-    //                         data: JSON.stringify(_r)
-    //                     } as EventHttpResponse
-    //                 }
-    //                 console.log(`[event]:${JSON.stringify(_event)}`);
-    //             }).catch((_e) => {
-    //                 let _event: Event = {
-    //                     type: EventType.HttpResposne,
-    //                     value: {
-    //                         url: response.url(),
-    //                         status: String(response.status()),
-    //                         data: JSON.stringify(_e)
-    //                     } as EventHttpResponse
-    //                 }
-    //                 console.log(`[event]:${JSON.stringify(_event)}`);
-    //             })
-    //         }
-    //     )
-    let events: Event[] = [];
+    let events: types.Event[] = [];
 
     var random_string = rsg()
     var reportIocFunctionName = 'reportIoC' + random_string;
     console.log('[analysis-debug] report Ioc function name:', reportIocFunctionName);
-    await page.exposeFunction(reportIocFunctionName, (event: Event) => {
+    await page.exposeFunction(reportIocFunctionName, (event: types.Event) => {
         console.log('[analysis-debug] suspicious activity: ', event);
         events.push(
             event
         );
     });
-    // var initHooksFunctionName = 'initHooks' + random_string;
-    // await page.exposeFunction(initHooksFunctionName, () => {
-    //     place_hooks(reportIocFunctionName)
-    // });
     const place_hooks_source_code = place_hooks.toString();
 
     try {
@@ -141,10 +102,4 @@ if (!fs.existsSync(sampleFile)) {
         await rbmqc.publish(RABBITMQ_REPORTS_QUEUE, `error analysing sample: ${err}`)
         await page.close();
     }
-        // })
-    // }
-//     setTimeout(async () => { 
-//         console.log("[analysis-debug] Closing browser...");
-//         await browser.close(); 
-// }, 5000);
 })();

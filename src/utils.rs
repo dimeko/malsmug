@@ -1,4 +1,4 @@
-use std::{fs, io::Read, path::PathBuf};
+use std::{ffi::OsStr, fs, io::Read, path::{Path, PathBuf}};
 // use yaml_rust2::{YamlLoader, YamlEmitter};
 use serde::{Serialize, Deserialize};
 use regex::Regex;
@@ -23,4 +23,39 @@ pub fn parse_yaml<T: for<'a> Deserialize<'a>>(p: PathBuf) -> Result<T, Error> {
         }
     };
     Ok(parsed_yaml)
+}
+
+pub fn parse_file_extension_of_file(file_name: String) -> String {
+    Path::new(file_name.as_str())
+        .extension()
+        .and_then(OsStr::to_str).unwrap_or("").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_with_normal_file() {
+        let ext = parse_file_extension_of_file("document.txt".to_string());
+        assert_eq!(ext, "txt");
+    }
+
+    #[test]
+    fn test_with_dot_file() {
+        let ext = parse_file_extension_of_file(".hiddenfile".to_string());
+        assert_eq!(ext, "");
+    }
+
+    #[test]
+    fn test_with_multiple_dots() {
+        let ext = parse_file_extension_of_file("archive.tar.gz".to_string());
+        assert_eq!(ext, "gz");
+    }
+
+    #[test]
+    fn test_with_path() {
+        let ext = parse_file_extension_of_file("/some/path/to/file.rs".to_string());
+        assert_eq!(ext, "rs");
+    }
 }

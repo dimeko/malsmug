@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use core::fmt;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum EventType {
     HttpRequest,
@@ -29,53 +29,53 @@ impl fmt::Display for EventType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventHttpRequest {
     pub method: String,
     pub url: String,
     pub data: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventHttpResponse {
     pub status: String,
     pub url: String,
     pub data: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventConsoleLog {
     pub text: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventFunctionCall {
     pub callee: String,
     pub arguments: Vec<String>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventNewHtmlElement {
     #[serde(rename = "elementType")]
     pub element_type: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventSetCookie {
     pub cookie: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventGetCookie {
     pub cookie: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventAddEventListener {
     pub listener: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum EventValue {
     EventHttpRequest(EventHttpRequest),
@@ -88,7 +88,7 @@ pub enum EventValue {
     EventAddEventListener(EventAddEventListener)
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Event {
     #[serde(rename = "type")]
     pub event_type: EventType,

@@ -9,6 +9,7 @@ use env_logger::Builder;
 mod store;
 mod utils;
 mod app;
+mod analysis;
 mod bootstrap;
 
 use app::ServerMethods;

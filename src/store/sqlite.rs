@@ -23,9 +23,10 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 name,
                 file_hash,
                 file_name,
+                file_extension,
                 has_been_analysed,
                 severity,
-                analysis_report_description
+                analysis_report
                 FROM file_analysis_reports WHERE uid = ?"#, uid)
             .fetch_one(&self.pool)
             .await.ok();
@@ -38,9 +39,10 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 name,
                 file_hash,
                 file_name,
+                file_extension,
                 has_been_analysed,
                 severity,
-                analysis_report_description
+                analysis_report
                 FROM file_analysis_reports WHERE file_hash = ?"#, hash)
             .fetch_one(&self.pool)
             .await.ok();
@@ -52,15 +54,16 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
         report.uid = Some(new_uuid.to_string()); // TODO: generate uuid
     
         sqlx::query!(r#"INSERT INTO file_analysis_reports
-                (uid, name, file_hash, file_name, has_been_analysed, severity, analysis_report_description)
-                VALUES (?,?,?,?,?,?,?)"#,
+                (uid, name, file_hash, file_name, file_extension, has_been_analysed, severity, analysis_report)
+                VALUES (?,?,?,?,?,?,?,?)"#,
             report.uid,
             report.name,
             report.file_hash,
             report.file_name,
+            report.file_extension,
             report.has_been_analysed,
             report.severity,
-            report.analysis_report_description
+            report.analysis_report
         ).execute(&self.pool).await?;
         Ok(())
     }

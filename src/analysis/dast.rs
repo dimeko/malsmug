@@ -1,7 +1,7 @@
+use std::fmt::Error;
 use std::io::Read;
-use std::path::PathBuf;
 use std::fs::File;
-use std::process::Command;
+use axum::response::sse::Event;
 use serde::Deserialize;
 use serde_json::Value;
 use log::{error, warn, debug, info};
@@ -10,11 +10,11 @@ use async_std::task::block_on;
 use url::Url;
 use publicsuffix::{Psl, List};
 use std::str;
-use std::env::current_dir;
 
-use crate::analyzer;
-use crate::dast_event_types;
+use crate::analysis::analyzer::Finding;
 use crate::utils;
+use crate::analysis::analyzer;
+use crate::analysis::dast_event_types;
 
 const KNOWN_SENSITIVE_DATA_KEYS: [&str; 5] = [
     "ASPSESSIONID",
@@ -63,16 +63,19 @@ struct SpamHausResponse {
     dimensions: Value
 }
 
+#[derive(Clone)]
 pub struct DastAnalyzer {
     cached_domain_reputations: HashMap<String, f32>,
+    file_hash_events: HashMap<String, Vec<dast_event_types::Event>>,
+    file_hash_findings: HashMap<String, Vec<Finding>>,
 }
 
 impl DastAnalyzer {
     pub fn new() -> Self {
         DastAnalyzer { 
-            test_url_to_visit: url_to_visit,
             cached_domain_reputations: HashMap::new(),
-            interesting_findings: Vec::new()
+            file_hash_events: HashMap::new(),
+            file_hash_findings: HashMap::new()
         }
     }
 
@@ -187,10 +190,35 @@ impl DastAnalyzer {
             }
         }
     }
+
+    fn load_events(&mut self, file_hash: String, events: Vec<dast_event_types::Event>) {
+        self.file_hash_events
+            .entry(file_hash.clone())
+            .and_modify(|e| { *e = events.clone() })
+            .or_insert(events);
+    }
+
+    fn get_events(&self, file_hash: String) -> Result<Vec<dast_event_types::Event>, String> {
+        if self.file_hash_events.contains_key(file_hash.as_str()) {
+            match self.file_hash_events.get(file_hash.as_str()) {
+                Some(_s) => {
+                    return Ok(_s.clone());
+                },
+                None => {
+                    return Err(format!("key {:?} does not exist", file_hash));
+                }
+            }
+        } else {
+            return Err(format!("key {:?} does not exist", file_hash));
+        }
+    }
 }
 
 impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
-    fn analyze(&mut self) -> Result<bool, String> {
+    fn analyze(&mut self, file_hash: String) -> Result<bool, String> {
+        if !self.file_hash_events.contains_key(file_hash.as_str()){
+            return Err("invalid file hash".to_string());
+        }
         // ---------------------------------------------------
         // dynamic analysis steps
         //
@@ -198,125 +226,115 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         // this is a simple method at the moment.  In future versions
         // we can send events in and out of the sandbox by running a server
         // on the host
-        for mut _l in lines_stdout { // Here we actually need to loop over a list of actual Events
-            let mut buf = String::new();
-            let _ = _l.read_to_string(&mut buf);
-            if let Some(pos) = buf.find("[event]:") {
-                let json_part = &buf[pos + 8..]; // Extract substring after ":"                
-                let event: dast_event_types::Event = match serde_json::from_str(json_part) {
-                    Ok(_d) => _d,
-                    Err(_e) => {
-                        warn!("could not parse vent data from sandbox");
-                        continue;
+        let immutable_self = self.clone();
+
+        for event in immutable_self.file_hash_events.get(file_hash.clone().as_str()).unwrap() {
+            match event.clone().value {
+                dast_event_types::EventValue::EventHttpRequest(_v) => {
+                    // analysis: check response url domain reputation
+                    let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
+                    if _score <= 20.0 && _score > 0.0 {
+                        self.file_hash_findings.entry(file_hash.clone().to_string())
+                            .or_insert_with(|| Vec::new()).push(
+                                analyzer::Finding { 
+                                    severity: analyzer::Severity::High,
+                                    poc: _v.url,
+                                    title: "bad reputation url called".to_string()
+                                });
                     }
-                };
 
-                match event.value {
-                    dast_event_types::EventValue::EventHttpRequest(_v) => {
-                        // analysis: check response url domain reputation
-                        let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
-                        if _score <= 20.0 && _score > 0.0 {
-                            self.findings.push(
-                                analyzer::Finding { 
-                                    severity: analyzer::Severity::High,
-                                    poc: _v.url,
-                                    title: "bad reputation url called".to_string()
-                                });
-                        }
+                    // analysis: check for user input sent in request
+                    // "fake_input_from_sandbox_" is the default input prefix that the sandbox puts inside the input fields 
+                    if _v.data.contains("fake_input_from_sandbox_") {
+                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                            analyzer::Finding { 
+                                severity: analyzer::Severity::VeryHigh,
+                                poc: _v.data,
+                                title: "http request sent containing user input data".to_string()
+                            });
+                    }
+                },
+                dast_event_types::EventValue::EventHttpResponse(_v) => {
+                    // analysis: check response url domain reputation
+                    let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
+                    if _score <= 20.0 && _score > 0.0 {
+                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                            analyzer::Finding { 
+                                severity: analyzer::Severity::High,
+                                poc: _v.url,
+                                title: "bad reputation url called".to_string()
+                            });
+                    }
 
-                        // analysis: check for user input sent in request
-                        // "fake_input_from_sandbox_" is the default input prefix that the sandbox puts inside the input fields 
-                        if _v.data.contains("fake_input_from_sandbox_") { 
-                            self.findings.push(
-                                analyzer::Finding { 
-                                    severity: analyzer::Severity::VeryHigh,
-                                    poc: _v.data,
-                                    title: "http request sent containing user input data".to_string()
-                                });
-                        }
-                    },
-                    dast_event_types::EventValue::EventHttpResponse(_v) => {
-                        // analysis: check response url domain reputation
-                        let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
-                        if _score <= 20.0 && _score > 0.0 {
-                            self.findings.push(
-                                analyzer::Finding { 
-                                    severity: analyzer::Severity::High,
-                                    poc: _v.url,
-                                    title: "bad reputation url called".to_string()
-                                });
-                        }
-
-                    },
-                    dast_event_types::EventValue::EventNewHtmlElement(_v) => {
-                        // analysis: check if the target creates new html elements that can potentially access the internet
-                        if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
-                            self.findings.push(
-                                analyzer::Finding { 
-                                    severity: analyzer::Severity::VeryHigh,
-                                    poc: _v.element_type,
-                                    title: "dangerous html element created".to_string()
-                                });
-                        }
-                    },
-                    dast_event_types::EventValue::EventFunctionCall(_v) => {
-                        // analysis: check document.write call with the first argument being an html-like element
-                        if matches!(_v.callee.as_str(), "document.write") && _v.arguments.len() > 0 {
-                            if utils::contains_html_like_code(_v.arguments[0].as_str()) {
-                                self.findings.push(
-                                    analyzer::Finding { 
-                                        severity: analyzer::Severity::VeryHigh,
-                                        poc: _v.callee,
-                                        title: "document.write was called with html element as parameter".to_string()
-                                    });
-                            }
-                        } else if matches!(_v.callee.as_str(), "window.eval") {
-                            // analysis: check window.eval call
-                            // here we could also check whether the eval paramater is actually a malicious Javascript code
-                            // for now we check just the dangerous call to `.eval`
-                            self.findings.push(
+                },
+                dast_event_types::EventValue::EventNewHtmlElement(_v) => {
+                    // analysis: check if the target creates new html elements that can potentially access the internet
+                    if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
+                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                            analyzer::Finding { 
+                                severity: analyzer::Severity::VeryHigh,
+                                poc: _v.element_type,
+                                title: "dangerous html element created".to_string()
+                            });
+                    }
+                },
+                dast_event_types::EventValue::EventFunctionCall(_v) => {
+                    // analysis: check document.write call with the first argument being an html-like element
+                    if matches!(_v.callee.as_str(), "document.write") && _v.arguments.len() > 0 {
+                        if utils::contains_html_like_code(_v.arguments[0].as_str()) {
+                            self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: _v.callee,
-                                    title: "window.eval was called".to_string()
+                                    title: "document.write was called with html element as parameter".to_string()
                                 });
-                        } else if matches!(_v.callee.as_str(), "window.execScript") {
-                            // analysis: check window.execScript call
-                            self.findings.push(
+                        }
+                    } else if matches!(_v.callee.as_str(), "window.eval") {
+                        // analysis: check window.eval call
+                        // here we could also check whether the eval paramater is actually a malicious Javascript code
+                        // for now we check just the dangerous call to `.eval`
+                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                                analyzer::Finding { 
+                                severity: analyzer::Severity::VeryHigh,
+                                poc: _v.callee,
+                                title: "window.eval was called".to_string()
+                            });
+                    } else if matches!(_v.callee.as_str(), "window.execScript") {
+                        // analysis: check window.execScript call
+                        self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
+                            analyzer::Finding { 
+                                severity: analyzer::Severity::VeryHigh,
+                                poc: _v.callee,
+                                title: "window.execScript was called".to_string()
+                            });
+                    } else if matches!(_v.callee.as_str(), "window.localStorage.getItem")  && _v.arguments.len() > 0 {
+                        // analysis: check whether the target tries to access sinsitive data keys
+                        if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.arguments[0].as_str()) {
+                            self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::VeryHigh,
-                                    poc: _v.callee,
-                                    title: "window.execScript was called".to_string()
+                                    poc: format!("{}({})", _v.callee, &_v.arguments[0].as_str()),
+                                    title: "window.localStorage tried to access sensitive information".to_string()
                                 });
-                        } else if matches!(_v.callee.as_str(), "window.localStorage.getItem")  && _v.arguments.len() > 0 {
-                            // analysis: check whether the target tries to access sinsitive data keys
-                            if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.arguments[0].as_str()) {
-                                self.findings.push(
-                                    analyzer::Finding { 
-                                        severity: analyzer::Severity::VeryHigh,
-                                        poc: format!("{}({})", _v.callee, &_v.arguments[0].as_str()),
-                                        title: "window.localStorage tried to access sensitive information".to_string()
-                                    });
-                            }
                         }
-                    },
-                    dast_event_types::EventValue::EventGetCookie(_v) => {
-                        if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.cookie.as_str()) {
-                            self.findings.push(
+                    }
+                },
+                dast_event_types::EventValue::EventGetCookie(_v) => {
+                    if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.cookie.as_str()) {
+                            self.file_hash_findings.entry(file_hash.clone()).or_insert_with(|| Vec::new()).push(
                                 analyzer::Finding { 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: "document.cookie".to_string(),
                                     title: "document.cookie tried to access sensitive data key".to_string()
                                 });
-                        }
-                    },
-                    dast_event_types::EventValue::EventAddEventListener(_v) => {
-                        debug!("added event_listener: {}", _v.listener);
                     }
-                    _ => {
-                        warn!("event of type {} was not handled", event.event_type)
-                    }
-                };
+                },
+                dast_event_types::EventValue::EventAddEventListener(_v) => {
+                    debug!("added event_listener: {}", _v.listener);
+                }
+                _ => {
+                    warn!("event of type {} was not handled", event.event_type)
+                }
             }
         }
         // end of analysis
@@ -324,7 +342,14 @@ impl<'a> analyzer::Analyzer<'a> for DastAnalyzer {
         Ok(true)
     }
 
-    fn get_findings(&self) -> &Vec<analyzer::Finding> {
-        &self.findings
+    fn get_findings(&self, file_hash: String) -> Option<&Vec<analyzer::Finding>> {
+        match self.file_hash_findings.get(file_hash.as_str()) {
+            Some(f) => {
+                return Some(f);
+            },
+            None => {
+                return None
+            }
+        }
     }
 }

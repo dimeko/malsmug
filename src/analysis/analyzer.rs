@@ -30,6 +30,7 @@ impl fmt::Display for Severity {
     }
 }
 
+#[derive(Clone)]
 pub struct Finding {
     pub severity: Severity,
     pub poc: String,
@@ -43,6 +44,6 @@ impl fmt::Display for Finding {
 }
 
 pub trait Analyzer<'a> {
-    fn get_findings(&self) -> &Vec<Finding>;
-    fn analyze(&mut self) -> Result<bool, String>;
+    fn get_findings(&self, file_hash: String) -> Option<&Vec<Finding>>;
+    fn analyze(&mut self, file_hash: String) -> Result<bool, String>;
 }
