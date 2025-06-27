@@ -19,10 +19,11 @@ class Lure {
                 _form.submit()
             })
         }
+        console.log("[analysis-debug] forms lure finished")
     }
 
     public async start_lure() {
-        this._forms_lure()
+        await this._forms_lure()
     }
 }
 

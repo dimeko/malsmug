@@ -13,14 +13,18 @@
   "author": "dimeko",
   "license": "ISC",
   "dependencies": {
+    "amqplib": "^0.10.8",
     "chalk": "^4.1.2",
     "clear": "^0.1.0",
     "commander": "^13.1.0",
     "figlet": "^1.8.0",
+    "js-sha256": "^0.11.1",
     "path": "^0.12.7",
-    "puppeteer": "^24.4.0"
+    "puppeteer": "^24.4.0",
+    "random-string-generator": "^1.0.7"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "@types/node": "^22.13.13",
     "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",

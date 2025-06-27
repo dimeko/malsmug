@@ -1,11 +1,17 @@
 use core::fmt;
 
+use serde::{Deserialize, Serialize};
+
+use crate::{analysis::dast_event_types, store::models::FileAnalysisReport};
+
 #[allow(dead_code)]
+#[repr(i64)]
+#[derive(PartialEq, PartialOrd, Serialize)]
 pub enum Severity {
-    Low,
-    Moderate,
-    High,
-    VeryHigh
+    Low = 2,
+    Moderate = 5,
+    High = 8,
+    VeryHigh = 10
 }
 
 impl Clone for Severity {
@@ -30,6 +36,8 @@ impl fmt::Display for Severity {
     }
 }
 
+#[derive(Clone)]
+#[derive(Serialize)]
 pub struct Finding {
     pub severity: Severity,
     pub poc: String,
@@ -42,7 +50,10 @@ impl fmt::Display for Finding {
     }
 }
 
-pub trait Analyzer<'a> {
-    fn get_findings(&self) -> &Vec<Finding>;
-    fn analyze(&mut self) -> Result<bool, String>;
+pub trait DastAnalyze<'a> {
+    fn analyze(&mut self, file_report: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String>;
+}
+
+pub trait SastAnalyze<'a> {
+    fn analyze(&mut self, file_report: FileAnalysisReport, source_code: Vec<u8>) -> Result<Vec<Finding>, String>;
 }

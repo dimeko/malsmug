@@ -4,3 +4,8 @@
 /whatever/
 findings.md
 /sandbox/dist/
+malsmug.db*
+.sqlx
+notes.txt
+**venv
+js-samples

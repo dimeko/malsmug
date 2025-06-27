@@ -1,6 +1,3 @@
-use std::{fs::File, io::Read, path::{Path, PathBuf}};
-use log::error;
-
 use oxc::{ast::ast::{Argument, Expression, Program}, ast_visit::walk::walk_call_expression};
 use oxc::{allocator::Allocator, ast::ast::CallExpression, ast::ast::BinaryExpression};
 use oxc::parser::{
@@ -9,7 +6,7 @@ use oxc::parser::{
 use oxc::span::SourceType;
 use oxc::ast_visit::{walk, Visit};
 
-use crate::analyzer;
+use crate::{analysis::analyzer::{self, Finding}, store::models::FileAnalysisReport};
 use crate::utils;
 
 // creating different struct here in order to be able to create
@@ -87,12 +84,12 @@ fn binary_expression_resolver(expr: &BinaryExpression) -> Vec<BinaryExpressionMe
 }
 
 #[allow(dead_code)]
-struct Scanner<'a> {
-    source: &'a str,
+struct Scanner {
+    source: Vec<u8>,
     _interesting_items: Vec<StaticAnalysisIoC>
 }
 
-impl<'a> Visit<'a> for Scanner<'a> {
+impl<'a> Visit<'a> for Scanner {
     fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
         if let Expression::StaticMemberExpression(_c) = &it.callee { // rule for file1
             if matches!(_c.property.name.as_str(), "eval" | "execScript") {
@@ -135,50 +132,34 @@ impl<'a> Visit<'a> for Scanner<'a> {
     }
 }
 
-pub struct SastAnalyzer {
-    source_text: String,
-    file_path: PathBuf,
-    findings: Vec<analyzer::Finding>
-}
+pub struct SastAnalyzer {}
 
 impl SastAnalyzer {
-    pub fn new(file_path: PathBuf) -> Self {
-        let mut _f = match File::open(&file_path) {
-            Ok(_f) => _f,
-            Err(_e) => {
-                error!("error opening {}: {}", file_path.to_string_lossy(), _e);
-                std::process::exit(1)
-            }
-        };
-
-        let mut _str_from_file = String::new();
-        let _string = _f.read_to_string(&mut _str_from_file).unwrap();
-
-        SastAnalyzer {
-            file_path,
-            source_text: _str_from_file,
-            findings: Vec::new()
-        }
+    pub fn new() -> Self {
+        SastAnalyzer {}
     }
 
-    fn _scan_ast(&mut self, ast: Program) -> Vec<StaticAnalysisIoC> {
-        let mut scanner = Scanner { source: &self.source_text, _interesting_items: Vec::new() };
+    fn scan_ast(&mut self, source_code: Vec<u8>, ast: Program) -> Option<Vec<StaticAnalysisIoC>> {
+        let mut scanner = Scanner { source: source_code, _interesting_items: Vec::new() };
         walk::walk_program::<Scanner>(&mut scanner, &ast);
-        return scanner._interesting_items
-    }
-
-    fn get_src_text(&self) -> String {
-        self.source_text.clone()
+        return Some(scanner._interesting_items);
     }
 }
 
-impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
-    fn analyze(&mut self) -> Result<bool, String> {
+impl<'a> analyzer::SastAnalyze<'a> for SastAnalyzer {
+    fn analyze(&mut self, file_report: FileAnalysisReport, source_code: Vec<u8>) -> Result<Vec<Finding>, String> {
         // analysis parameters preparation
-        let source_type: SourceType = SourceType::from_path(Path::new(&self.file_path)).unwrap();
+        let mut findings: Vec<Finding> = Vec::new();
+        let source_type: SourceType = SourceType::from_extension(&file_report.file_extension.as_str()).unwrap();
         let allocator = Allocator::default();
-        let binding = self.get_src_text();
-        let _src_str = &binding.as_str();
+
+         let binding_vec = source_code.to_vec();
+         let _src_str = match str::from_utf8(&binding_vec) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("could not parse source code bytes to string. Error: {:?}", e));
+            }
+        };
         let js_file_ast = JSParser::new(&allocator, _src_str, source_type)
             .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
             .parse();
@@ -186,21 +167,19 @@ impl<'a> analyzer::Analyzer<'a> for SastAnalyzer {
         // static analysis steps
 
         // analyse the Abstract Syntax Tree (for now)
-        let _interesting_findings = &mut self._scan_ast(js_file_ast.program).iter().map(|_it| {
+        let _interesting_findings_iter = &mut self.scan_ast(source_code, js_file_ast.program).unwrap();
+        let mut _interesting_findings: Vec<analyzer::Finding> = _interesting_findings_iter.iter().map(|_it| {
             return analyzer::Finding {
                 poc: _it.poc.clone(),
                 severity: _it.severity.clone(),
                 title: _it.title.to_string()
             }
         }).collect();
-        self.findings.append(_interesting_findings);
+        findings.append(&mut _interesting_findings);
+        // self.findings.append(_interesting_findings);
         // ...
         // end of analysis
         // ---------------------------------------------------
-        return Ok(true);
-    }
-
-    fn get_findings(&self) -> &Vec<analyzer::Finding> {
-        &self.findings
+        return Ok(findings);
     }
 }
