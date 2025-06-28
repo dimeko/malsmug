@@ -6,7 +6,7 @@ use crate::{analysis::dast_event_types, store::models::FileAnalysisReport};
 
 #[allow(dead_code)]
 #[repr(i64)]
-#[derive(PartialEq, PartialOrd, Serialize)]
+#[derive(Deserialize, PartialEq, PartialOrd, Serialize, Debug)]
 pub enum Severity {
     Low = 2,
     Moderate = 5,
@@ -36,9 +36,15 @@ impl fmt::Display for Severity {
     }
 }
 
-#[derive(Clone)]
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum AnalysisType {
+    Static,
+    Dynamic
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Finding {
+    pub r#type: AnalysisType,
     pub severity: Severity,
     pub poc: String,
     pub title: String,
@@ -51,7 +57,7 @@ impl fmt::Display for Finding {
 }
 
 pub trait DastAnalyze<'a> {
-    fn analyze(&mut self, file_report: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String>;
+    async fn analyze(&mut self, file_report: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String>;
 }
 
 pub trait SastAnalyze<'a> {

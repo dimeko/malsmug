@@ -5,18 +5,15 @@ import { Lure } from "./lure";
 import { RBMQ } from "./rbmq";
 import * as types from "./types";
 import rsg from "random-string-generator";
+import yaml from 'yaml';
 import { sha256 } from 'js-sha256';
 
-const RABBITMQ_MALSMUG_ANALYSIS_EXCHANGE = "malsmug.analysis"
-const RABBITMQ_FILES_QUEUE = "malsmug.files_for_analysis"
-const RABBITMQ_REPORTS_QUEUE = "malsmug.analysis_iocs"
-
-
-// const urlToVisit = "https://facebook.com";
 const args = process.argv;
 
 var sampleFile = args[2]
 var baitWebsite = args[3]
+var configFolder = args[4]
+var analysisId = args[5]
 
 if (!sampleFile) {
     console.error("Error: No JavaScript file provided!");
@@ -29,7 +26,7 @@ if (!fs.existsSync(sampleFile)) {
 }
 
 (async () => {
-    console.log("[analysis-debug] Launching browser...");
+    console.log("[analysis-debug] Launching browser ...");
     const browser = await puppeteer.launch({
         headless: true,
         dumpio: true,
@@ -40,15 +37,13 @@ if (!fs.existsSync(sampleFile)) {
             "--no-sandbox"
         ]
     });
+    console.log("[analysis-debug] Connecting to RabbitMQ ...");
 
-    let rbmqc = await RBMQ.create(
-        "rabbitmq",
-        RABBITMQ_MALSMUG_ANALYSIS_EXCHANGE,
-        RABBITMQ_FILES_QUEUE
-    )
+    const rabbitmq_config_file = fs.readFileSync(configFolder + "/rabbitmq.yaml", 'utf8');
+    const rabbitmq_config: types.RabbitMQConfig = yaml.parse(rabbitmq_config_file);
 
-    // while(true) {
-    //     await rbmqc.consume(RABBITMQ_FILES_QUEUE, async (buff: Buffer<ArrayBufferLike>) => {
+    let rbmqc = await RBMQ.create(rabbitmq_config)
+
     console.log("[analysis-debug] Launched ...");
     const page = await browser.newPage();
 
@@ -90,9 +85,10 @@ if (!fs.existsSync(sampleFile)) {
         setTimeout(async () => { 
             let event_for_analysis: types.EventsFromAnalysis = {
                 file_hash: sha256(scriptCode),
+                analysis_id: analysisId,
                 events: events
             }
-            await rbmqc.publish(RABBITMQ_REPORTS_QUEUE, event_for_analysis)
+            await rbmqc.publish(rabbitmq_config.queues.sandbox_iocs_queue.name, event_for_analysis)
             try {
                 fs.rmSync(sampleFile)
             } catch(e) {
@@ -106,7 +102,7 @@ if (!fs.existsSync(sampleFile)) {
         } else {
             console.log("[analysis-error] Unknown error: ", err);
         }
-        await rbmqc.publish(RABBITMQ_REPORTS_QUEUE, `error analysing sample: ${err}`)
+        await rbmqc.publish(rabbitmq_config.queues.sandbox_iocs_queue.name, `error analysing sample: ${err}`)
         await page.close();
     }
 })();

@@ -105,10 +105,10 @@ async fn main() {
     info!("running server on {}", server_address);
 
     let rbmqc = rabbitclient::RabbitMQ::new(
-        "127.0.0.1".to_string(),
-        5672,
-        "ruser".to_string(),
-        "rpassword".to_string(),
+        rbmq_conf_from_file.connection.host.clone(),
+        rbmq_conf_from_file.connection.host_port.clone(),
+        rbmq_conf_from_file.connection.username.clone(),
+        rbmq_conf_from_file.connection.password.clone(),
         rabbitclient::RabbitMQConfig::new(rbmq_conf_from_file)
     ).await;
     let s = app::Server::new(&server_address, Box::new(rbmqc)).await;

@@ -2,11 +2,11 @@ pub mod rabbitmq_conf {
     use serde::{Serialize, Deserialize};
 
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
-    pub struct RabbitMQExtHostConf {
+    pub struct RabbitMQExtConnectionConf {
         pub host: String,
-        pub docker: String,
         pub host_port: u16,
-        pub docker_port: u16
+        pub username: String,
+        pub password: String
     }
 
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub mod rabbitmq_conf {
 
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
     pub struct RabbitMQExtConf {
-        pub host: RabbitMQExtHostConf,
+        pub connection: RabbitMQExtConnectionConf,
         pub queues: RabbitMQExtQueuesConf,
         pub exchanges: RabbitMQExtExchangesConf
     }

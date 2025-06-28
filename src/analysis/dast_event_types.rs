@@ -92,5 +92,6 @@ pub enum EventValue {
 pub struct Event {
     #[serde(rename = "type")]
     pub event_type: EventType,
+    pub timestamp: u64,
     pub value: EventValue,
 }

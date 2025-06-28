@@ -8,12 +8,15 @@ use crate::{analysis::dast_event_types::{self, Event}, store::models::FileAnalys
 pub struct FileForAnalysis {
     pub file_name: String,
     pub file_hash: String,
+    pub analysis_id: String,
+    pub bait_websites: Vec<String>,
     pub file_bytes: Vec<u8>
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EventsFromAnalysis {
     pub file_hash: String,
+    pub analysis_id: String,
     pub events: Vec<dast_event_types::Event>
 }
 
@@ -41,9 +44,13 @@ pub struct GetFileReport {
 
 #[derive(Deserialize, Serialize)]
 pub enum Responses {
+    #[serde(rename = "body")]
     GenericErrorResponse(GenericErrorResponse),
+    #[serde(rename = "body")]
     GenericSuccessResponse(GenericSuccessResponse),
+    #[serde(rename = "body")]
     FileUploadResponse(FileUploadResponse),
+    #[serde(rename = "body")]
     GetFileReport(GetFileReport)
 }
 

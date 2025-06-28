@@ -1,5 +1,9 @@
 
+use crate::analysis::analyzer::Finding;
+
 use super::{models::FileAnalysisReport, FileAnalysisReportStoreTrait};
+use log::debug;
+use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, Error};
 use uuid::{Uuid};
 use async_trait::async_trait;
@@ -15,47 +19,107 @@ impl FileAnalysisReportStore {
     }
 }
 
+#[derive(Clone, Debug)]
+#[derive(Deserialize, Serialize)]
+pub struct FileAnalysisReportRaw {
+    pub uid: Option<String>,
+    pub name: String,
+    pub file_hash: String,
+    pub file_name: String,
+    pub file_extension: String,
+    pub last_analysis_id: String,
+    pub has_been_analysed: bool,
+    pub dynamic_analysis: bool, 
+    pub static_analysis: bool,
+    pub severity: i64,
+    pub bait_websites: String,
+    pub findings: String,
+}
+
+// impl From<FileAnalysisReport> for FileAnalysisReportRaw {
+//   fn from(file_analysis_report: FileAnalysisReport) -> Self {
+//         FileAnalysisReportRaw {
+//             uid: file_analysis_report.uid,
+//             name: file_analysis_report.name,
+//             file_hash: file_analysis_report.file_hash,
+//             file_name: file_analysis_report.file_name,
+//             file_extension: file_analysis_report.file_extension,
+//             has_been_analysed: file_analysis_report.has_been_analysed,
+//             dynamic_analysis: file_analysis_report.dynamic_analysis,
+//             static_analysis: file_analysis_report.static_analysis,
+//             severity: file_analysis_report.severity,
+//             bait_websites: file_analysis_report.bait_websites.join(","),
+//             analysis_report: file_analysis_report.analysis_report,
+//         }
+//     }
+// }
+
 #[async_trait]
 impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
     async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport> {
-        let report = sqlx::query_as!(
-            FileAnalysisReport, r#"SELECT uid,
+        let report_raw = sqlx::query_as!(
+            FileAnalysisReportRaw, r#"SELECT uid,
                 name,
                 file_hash,
                 file_name,
                 file_extension,
+                last_analysis_id,
                 has_been_analysed,
+                dynamic_analysis,
+                static_analysis,
                 severity,
-                analysis_report
+                bait_websites,
+                findings
                 FROM file_analysis_reports WHERE uid = ?"#, uid)
             .fetch_one(&self.pool)
             .await.ok();
-            report
+        match report_raw {
+            Some(r) =>
+            return Some(FileAnalysisReport::from(r)),
+            None => None
+        }
+        
     }
 
     async fn get_file_report_by_file_hash(&self, hash: &str) -> Option<FileAnalysisReport> {
-        let report = sqlx::query_as!(
-            FileAnalysisReport, r#"SELECT uid,
+        let report_raw = sqlx::query_as!(
+            FileAnalysisReportRaw, r#"SELECT uid,
                 name,
                 file_hash,
                 file_name,
                 file_extension,
+                last_analysis_id,
                 has_been_analysed,
+                dynamic_analysis,
+                static_analysis,
                 severity,
-                analysis_report
+                bait_websites,
+                findings
                 FROM file_analysis_reports WHERE file_hash = ?"#, hash)
             .fetch_one(&self.pool)
             .await.ok();
-            report 
+        match report_raw {
+            Some(r) =>
+                return Some(FileAnalysisReport::from(r)),
+            None => None
+        }
     }
 
     async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> anyhow::Result<()> {
+        let json_string_findings = match serde_json::to_string::<Vec<Finding>>(&updated_file_analysis_report.findings) {
+            Ok(r) => r,
+            Err(e) => {
+                debug!("ERROR: could convert findings json  to json string");
+                String::new()
+            }
+        };
         sqlx::query!(r#"UPDATE file_analysis_reports
-                    SET has_been_analysed = ?, severity = ?, analysis_report = ? WHERE uid = ? 
+                    SET has_been_analysed = ?, severity = ?, findings = ?, last_analysis_id = ? WHERE uid = ? 
                 "#,
                 updated_file_analysis_report.has_been_analysed,
                 updated_file_analysis_report.severity,
-                updated_file_analysis_report.analysis_report,
+                json_string_findings,
+                updated_file_analysis_report.last_analysis_id,
                 uid
             )
             .fetch_one(&self.pool)
@@ -66,18 +130,42 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
     async fn create_file_report(&self, mut report: FileAnalysisReport) -> anyhow::Result<()> {
         let new_uuid = Uuid::new_v4();
         report.uid = Some(new_uuid.to_string()); // TODO: generate uuid
-    
+        let comma_sep_bait_websites = report.bait_websites.join(",");
+        let json_string_findings = match serde_json::to_string::<Vec<Finding>>(&report.findings) {
+            Ok(r) => r,
+            Err(e) => {
+                debug!("ERROR: could convert findings json  to json string");
+                String::new()
+            }
+        };
+
         sqlx::query!(r#"INSERT INTO file_analysis_reports
-                (uid, name, file_hash, file_name, file_extension, has_been_analysed, severity, analysis_report)
-                VALUES (?,?,?,?,?,?,?,?)"#,
+                (
+                    uid,
+                    name,
+                    file_hash,
+                    file_name,
+                    file_extension,
+                    last_analysis_id,
+                    has_been_analysed,
+                    dynamic_analysis,
+                    static_analysis,
+                    severity,
+                    bait_websites,
+                    findings)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"#,
             report.uid,
             report.name,
             report.file_hash,
             report.file_name,
             report.file_extension,
+            report.last_analysis_id,
             report.has_been_analysed,
+            report.dynamic_analysis,
+            report.static_analysis,
             report.severity,
-            report.analysis_report
+            comma_sep_bait_websites,
+            json_string_findings
         ).execute(&self.pool).await?;
         Ok(())
     }

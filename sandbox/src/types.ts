@@ -1,3 +1,29 @@
+interface RabbitMQQueue {
+    name: string;
+    durable: boolean;
+    auto_delete: boolean;
+}
+
+interface RabbitMQExchange {
+    name: string;
+}
+
+interface RabbitMQConfig {
+    connection: {
+        host: string;
+        port: number;
+        username: string;
+        password: string;
+    };
+    queues: {
+        core_files_queue: RabbitMQQueue;
+        sandbox_iocs_queue: RabbitMQQueue;
+    };
+    exchanges: {
+        main_exchange: RabbitMQExchange;
+    }
+}
+
 const enum EventType {
     HttpRequest = "http_request",
     HttpResposne = "http_response",
@@ -46,7 +72,6 @@ type EventAddEventListener = {
     listener: string
 }
 
-
 type Event = {
     type: EventType,
     timestamp: number,
@@ -62,6 +87,7 @@ type Event = {
 
 type EventsFromAnalysis = {
     file_hash: string,
+    analysis_id: string,
     events: Event[]
 }
 
@@ -76,5 +102,8 @@ export {
     EventHttpResponse, 
     EventConsoleLog, 
     EventAddEventListener,
-    EventsFromAnalysis
+    EventsFromAnalysis,
+    RabbitMQConfig,
+    RabbitMQQueue,
+    RabbitMQExchange
 }

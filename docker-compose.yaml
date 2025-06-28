@@ -4,11 +4,11 @@ services:
     container_name: rabbitmq
     restart: always
     ports:
-      - 5672:5672
+      - ${RABBITMQ_CONNECTION_PORT}:5672
       - 15672:15672
     environment:
-      RABBITMQ_DEFAULT_USER: ruser
-      RABBITMQ_DEFAULT_PASS: rpassword
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_CONNECTION_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_CONNECTION_PASSWORD}
     configs:
       - source: rabbitmq-plugins
         target: /etc/rabbitmq/enabled_plugins
@@ -23,6 +23,7 @@ services:
     container_name: js-sandbox-av
     volumes:
       - ./sandbox/consumer/main.py:/sandbox/consumer/main.py
+      - ${CONFIG_FOLDER}:/sandbox/config/
     cap_add:
       - NET_ADMIN # this capability is needed in case we want to block outgoing TCP traffic
 

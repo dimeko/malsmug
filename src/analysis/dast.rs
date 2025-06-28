@@ -4,7 +4,6 @@ use serde::Deserialize;
 use serde_json::Value;
 use log::{error, warn, debug, info};
 use std::collections::HashMap;
-use async_std::task::block_on;
 use url::Url;
 use publicsuffix::{Psl, List};
 use std::str;
@@ -150,14 +149,15 @@ impl DastAnalyzer {
         info!("checking domain: {}", domain_string);
         let spamhaus_url = format!("https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/{}/overview", domain_string);
 
-        let _client = reqwest::blocking::Client::new();
+        let _client = reqwest::Client::new();
         let response = _client.get(spamhaus_url)
                 .header("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0")
-                .send();
-
+                .send().await;
         match response {
             Ok(_resp) => {
-                let _resp_body = &_resp.text().unwrap_or("{}".to_string());
+                debug!("got response from domain rep service: {:?}", _resp);
+
+                let _resp_body = &_resp.text().await.unwrap_or("{}".to_string());
                 debug!("response for {}: {}", domain_string, _resp_body);
                 let _domain_resp = match serde_json::from_str::<SpamHausResponse>(&_resp_body) {
                     Ok(_r) => {
@@ -190,7 +190,7 @@ impl DastAnalyzer {
 }
 
 impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
-    fn analyze(&mut self, _: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String> {
+    async fn analyze(&mut self, _: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String> {
         // ---------------------------------------------------
         // dynamic analysis
         //
@@ -199,15 +199,17 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
         // we can send events in and out of the sandbox by running a server
         // on the host
         let mut findings: Vec<Finding> = Vec::new();
-
+        
         for event in events {
+            // let inner_self = &mut self.clone();
             match event.clone().value {
                 dast_event_types::EventValue::EventHttpRequest(_v) => {
                     // analysis: check response url domain reputation
-                    let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
+                    let _score = self._get_domain_reputation(_v.url.as_str()).await;
                     if _score <= 20.0 && _score > 0.0 {
                         findings.push(
-                                analyzer::Finding { 
+                                analyzer::Finding {
+                                    r#type: analyzer::AnalysisType::Dynamic, 
                                     severity: analyzer::Severity::High,
                                     poc: _v.url,
                                     title: "bad reputation url called".to_string()
@@ -218,7 +220,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     // "fake_input_from_sandbox_" is the default input prefix that the sandbox puts inside the input fields 
                     if _v.data.contains("fake_input_from_sandbox_") {
                         findings.push(
-                            analyzer::Finding { 
+                            analyzer::Finding {
+                                r#type: analyzer::AnalysisType::Dynamic, 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.data,
                                 title: "http request sent containing user input data".to_string()
@@ -227,10 +230,11 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                 },
                 dast_event_types::EventValue::EventHttpResponse(_v) => {
                     // analysis: check response url domain reputation
-                    let _score = block_on(self._get_domain_reputation(_v.url.as_str()));
+                    let _score = self._get_domain_reputation(_v.url.as_str()).await;
                     if _score <= 20.0 && _score > 0.0 {
                         findings.push(
-                            analyzer::Finding { 
+                            analyzer::Finding {
+                                r#type: analyzer::AnalysisType::Dynamic, 
                                 severity: analyzer::Severity::High,
                                 poc: _v.url,
                                 title: "bad reputation url called".to_string()
@@ -242,7 +246,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     // analysis: check if the target creates new html elements that can potentially access the internet
                     if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
                         findings.push(
-                            analyzer::Finding { 
+                            analyzer::Finding {
+                                r#type: analyzer::AnalysisType::Dynamic, 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.element_type,
                                 title: "dangerous html element created".to_string()
@@ -254,7 +259,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     if matches!(_v.callee.as_str(), "document.write") && _v.arguments.len() > 0 {
                         if utils::contains_html_like_code(_v.arguments[0].as_str()) {
                             findings.push(
-                                analyzer::Finding { 
+                                analyzer::Finding {
+                                    r#type: analyzer::AnalysisType::Dynamic, 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: _v.callee,
                                     title: "document.write was called with html element as parameter".to_string()
@@ -265,7 +271,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         // here we could also check whether the eval paramater is actually a malicious Javascript code
                         // for now we check just the dangerous call to `.eval`
                         findings.push(
-                                analyzer::Finding { 
+                                analyzer::Finding {
+                                    r#type: analyzer::AnalysisType::Dynamic, 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
                                 title: "window.eval was called".to_string()
@@ -273,7 +280,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     } else if matches!(_v.callee.as_str(), "window.execScript") {
                         // analysis: check window.execScript call
                         findings.push(
-                            analyzer::Finding { 
+                            analyzer::Finding {
+                                r#type: analyzer::AnalysisType::Dynamic, 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
                                 title: "window.execScript was called".to_string()
@@ -282,7 +290,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         // analysis: check whether the target tries to access sinsitive data keys
                         if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.arguments[0].as_str()) {
                             findings.push(
-                                analyzer::Finding { 
+                                analyzer::Finding {
+                                    r#type: analyzer::AnalysisType::Dynamic, 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: format!("{}({})", _v.callee, &_v.arguments[0].as_str()),
                                     title: "window.localStorage tried to access sensitive information".to_string()
@@ -293,7 +302,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                 dast_event_types::EventValue::EventGetCookie(_v) => {
                     if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.cookie.as_str()) {
                             findings.push(
-                                analyzer::Finding { 
+                                analyzer::Finding {
+                                    r#type: analyzer::AnalysisType::Dynamic, 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: "document.cookie".to_string(),
                                     title: "document.cookie tried to access sensitive data key".to_string()
