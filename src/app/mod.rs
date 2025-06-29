@@ -7,7 +7,7 @@ use axum::{
     extract::{Multipart, Path},
     http::StatusCode,
     response::IntoResponse,
-    routing::{post, get},
+    routing::{delete, get, post},
     Extension,
     Json,
     Router
@@ -24,7 +24,7 @@ pub mod types;
 
 use crate::{
     analysis::{
-        analyzer::{self, DastAnalyze, Finding, SastAnalyze, Severity},dast::DastAnalyzer, sast::{self, SastAnalyzer}},
+        analyzer::{self, DastAnalyze, Finding, SastAnalyze, Severity},dast::DastAnalyzer, sast::{self}},
     app::types::EventsFromAnalysis,
     store::{self, models::FileAnalysisReport},
     utils
@@ -59,14 +59,43 @@ impl<'a> Server<'a> {
     }
 }
 
-async fn get_file_report(Extension(ctx): Extension<ApiContext>, Path(file_hash): Path<String>) -> impl IntoResponse {
-    let r = match ctx.store.db.file_analysis_report.get_file_report_by_file_hash(file_hash.as_str()).await {
-            Some(r) => {
-                (StatusCode::CREATED, Json(
+async fn delete_file_report(Extension(ctx): Extension<ApiContext>, Path(file_report_uid): Path<String>) -> impl IntoResponse {
+    let r = match ctx.store.db.file_analysis_report.delete_file_report(&file_report_uid).await {
+        Some(r) => {
+            (StatusCode::OK, Json(
                     types::Response{
-                            r:  types::Responses::GetFileReport(
-                                    types::GetFileReport {
-                                        file: r.copy_no_uid() // avoid returning uid. Just because we can
+                            r:  types::Responses::DeleteFileReport(
+                                    types::DeleteFileReport {
+                                        file_reports_deleted: r
+                                    }
+                                )
+                            }
+                        )
+                    )
+        },
+        None => {
+            (StatusCode::NOT_FOUND, Json(
+                types::Response{
+                        r:  types::Responses::GenericErrorResponse(
+                                types::GenericErrorResponse { msg: format!("Error deleting file {:?}", file_report_uid) }
+                            )
+                        }
+                    )
+                )
+        }
+    };
+    r
+}
+
+async fn get_file_reports(Extension(ctx): Extension<ApiContext>, Path(file_hash): Path<String>) -> impl IntoResponse {
+    let r = match ctx.store.db.file_analysis_report.get_file_reports_by_file_hash(file_hash.as_str()).await {
+            Some(r) => {
+                debug!("{} file analysis reports found", r.len());
+                (StatusCode::OK, Json(
+                    types::Response{
+                            r:  types::Responses::GetFileReports(
+                                    types::GetFileReports {
+                                        file_reports: r
                                     }
                                 )
                             }
@@ -134,19 +163,21 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
 
     // calculation of the hash of the file content
     let file_hash_from_bytes = sha256::digest(&total_file_bytes).to_string();
+    let analysis_uuid = Uuid::new_v4();
 
     // save report reference to database
-    match ctx.store.db.file_analysis_report.create_file_report(FileAnalysisReport::new(
+    let file_analysis_report  = match ctx.store.db.file_analysis_report.create_file_report(FileAnalysisReport::new(
         file_name.clone(),
         file_hash_from_bytes.clone(),
         file_name.clone(),
         file_extension,
-        String::new(),
+        analysis_uuid.to_string(),
         false,
         dynamic_analysis,static_analysis,
         0, bait_websites.to_owned(), Vec::new())).await {
-            Ok(_) => {
+            Ok(f) => {
                 info!("file {:?} report saved", file_name.clone());
+                f
             },
             Err(e) => {
                 error!("file {:?} report was NOT saved. Error: {:?}", file_name.clone(), e);
@@ -156,11 +187,10 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
                         )
                 }))
             }
-        }
+        };
 
     if dynamic_analysis {
         // prepare the FileForAnalysis details to be sent as byte stream to RBMQ
-        let analysis_uuid = Uuid::new_v4();
         let file_for_analysis = types::FileForAnalysis {
             file_name: file_name.clone(),
             file_hash: file_hash_from_bytes.clone(),
@@ -185,12 +215,12 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
 
     if static_analysis {
         let mut static_analyser = sast::SastAnalyzer::new();
-        match ctx.store.db.file_analysis_report.get_file_report_by_file_hash(file_hash_from_bytes.as_str()).await {
+        match ctx.store.db.file_analysis_report.get_file_report(file_analysis_report.uid.clone().unwrap().as_str()).await {
             Some(mut r) => {
                 match static_analyser.analyze(r.to_owned(), total_file_bytes) {
                     Ok(mut f) => {
                         info!("found {} findings for {:?}", f.len(), r.clone().file_name);
-                        r.has_been_analysed = true;
+                        // r.has_been_analysed = true; TODO: set a separate column to check if is analysed dynamically has_been_analysed_dynamically
                         let mut tmp_findings: Vec<Finding> = Vec::new();
 
                         let mut max_severity = Severity::Low;
@@ -252,7 +282,8 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
                 r:  types::Responses::FileUploadResponse(
                         types::FileUploadResponse {
                             msg: "file was submitted".to_string(),
-                            file_hash: file_hash_from_bytes
+                            file_hash: file_hash_from_bytes,
+                            file_analysis_report_uid: file_analysis_report.uid.unwrap()
                         }
                     )
                 }
@@ -267,7 +298,8 @@ impl<'a> ServerMethods<'a> for Server<'a> {
         let inner_store = self.store.clone();
         let app = Router::new()
             .route("/analyse-file", post(analyse_file))
-            .route("/get-file-report/{file_hash}", get(get_file_report))
+            .route("/delete-file-report/{file_report_uid}", delete(delete_file_report))
+            .route("/get-file-reports/{file_hash}", get(get_file_reports))
             .route_layer(
                 Extension(ApiContext {
                     store: Arc::from(self.store.clone()),
@@ -313,15 +345,23 @@ impl<'a> ServerMethods<'a> for Server<'a> {
                                         };
 
                                         // get file report stored in database on file upload
-                                        let mut file_report = match inner_store.db
+                                        let file_reports_with_the_same_hash = match inner_store.db
                                             .file_analysis_report
-                                            .get_file_report_by_file_hash(events_for_analysis.file_hash.as_str()).await {
+                                            .get_file_reports_by_file_hash(events_for_analysis.file_hash.as_str()).await {
                                                 Some(r) => r,
                                                 None => {
                                                     error!("report does not exist in database, aborting");
                                                     continue;
                                                 }
                                             };
+                                        // let's find the file_analysis_report that is related to the specific iocs
+                                        let mut file_report: FileAnalysisReport = FileAnalysisReport::empty();
+                                        for far in file_reports_with_the_same_hash {
+                                            if far.last_analysis_id == events_for_analysis.analysis_id {
+                                                file_report = far;
+                                                break;
+                                            }
+                                        }
 
                                         // this is used to decide whether we must to append to existing findings or
                                         // to initialize the dynamic analysis findings from the start.
@@ -330,15 +370,14 @@ impl<'a> ServerMethods<'a> for Server<'a> {
                                         // If they are different we must initialize them from the start as it mean we are
                                         // on a different analysis session. 
                                         let mut append_to_findings = false;
-                                        if file_report.last_analysis_id == events_for_analysis.analysis_id {
+                                        if file_report.has_been_analysed {
                                             append_to_findings = true;
                                         }
-                                        file_report.last_analysis_id = events_for_analysis.analysis_id;
+                                        file_report.has_been_analysed = true; // have to rename has_been_analysed
                                         if file_report.dynamic_analysis {
-                                            match dynamic_analyser.analyze(file_report.clone(), events_for_analysis.events).await {
+                                            match dynamic_analyser.analyze(file_report.clone(), events_for_analysis.iocs).await {
                                                 Ok(mut f) => {
                                                     info!("found {} findings for {:?}", f.len(), file_report.file_name);
-                                                    file_report.has_been_analysed = true;
                                                     let mut tmp_findings: Vec<Finding> = Vec::new();
                                                     let mut max_severity = Severity::Low;
                                                     for f in f.clone() {

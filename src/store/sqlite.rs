@@ -4,7 +4,7 @@ use crate::analysis::analyzer::Finding;
 use super::{models::FileAnalysisReport, FileAnalysisReportStoreTrait};
 use log::debug;
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Sqlite, Error};
+use sqlx::{Pool, Sqlite};
 use uuid::{Uuid};
 use async_trait::async_trait;
 
@@ -81,8 +81,8 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
         
     }
 
-    async fn get_file_report_by_file_hash(&self, hash: &str) -> Option<FileAnalysisReport> {
-        let report_raw = sqlx::query_as!(
+    async fn get_file_reports_by_file_hash(&self, hash: &str) -> Option<Vec<FileAnalysisReport>> {
+        let reports_raw = sqlx::query_as!(
             FileAnalysisReportRaw, r#"SELECT uid,
                 name,
                 file_hash,
@@ -96,19 +96,26 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 bait_websites,
                 findings
                 FROM file_analysis_reports WHERE file_hash = ?"#, hash)
-            .fetch_one(&self.pool)
+            .fetch_all(&self.pool)
             .await.ok();
-        match report_raw {
-            Some(r) =>
-                return Some(FileAnalysisReport::from(r)),
+        match reports_raw {
+            Some(rws) => {
+                let mut reports: Vec<FileAnalysisReport> = Vec::new();
+                for rw in rws {
+                    reports.push(FileAnalysisReport::from(rw));
+                }
+                return Some(reports);
+            },
             None => None
         }
+
+        
     }
 
     async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> anyhow::Result<()> {
         let json_string_findings = match serde_json::to_string::<Vec<Finding>>(&updated_file_analysis_report.findings) {
             Ok(r) => r,
-            Err(e) => {
+            Err(_) => {
                 debug!("ERROR: could convert findings json  to json string");
                 String::new()
             }
@@ -127,19 +134,31 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
         Ok(())
     }
 
-    async fn create_file_report(&self, mut report: FileAnalysisReport) -> anyhow::Result<()> {
+    async fn delete_file_report(&self, uid: &str) -> Option<u64> {
+        let res = sqlx::query!(r#"DELETE FROM file_analysis_reports WHERE uid = ? "#, uid).execute(&self.pool)
+            .await.ok();
+        return match res {
+            Some(r) => {
+                Some(r.rows_affected())
+            },
+            None => None
+        }
+    }
+
+
+    async fn create_file_report(&self, mut report: FileAnalysisReport) -> Result<FileAnalysisReport, String> {
         let new_uuid = Uuid::new_v4();
         report.uid = Some(new_uuid.to_string()); // TODO: generate uuid
         let comma_sep_bait_websites = report.bait_websites.join(",");
         let json_string_findings = match serde_json::to_string::<Vec<Finding>>(&report.findings) {
             Ok(r) => r,
-            Err(e) => {
+            Err(_) => {
                 debug!("ERROR: could convert findings json  to json string");
                 String::new()
             }
         };
 
-        sqlx::query!(r#"INSERT INTO file_analysis_reports
+        let res = sqlx::query!(r#"INSERT INTO file_analysis_reports
                 (
                     uid,
                     name,
@@ -166,7 +185,14 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
             report.severity,
             comma_sep_bait_websites,
             json_string_findings
-        ).execute(&self.pool).await?;
-        Ok(())
+        ).execute(&self.pool).await;
+        match res {
+            Ok(_) => {
+                return Ok(report)
+            },
+            Err(e) => {
+                return Err(format!("error creating new file_analysis_report: {:?}", e))
+            }
+        }
     }
 }

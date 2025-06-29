@@ -1,8 +1,6 @@
-use rmp;
 use serde::{Deserialize, Serialize};
-use rmp_serde::{Deserializer, Serializer};
 
-use crate::{analysis::dast_event_types::{self, Event}, store::models::FileAnalysisReport};
+use crate::{analysis::dast_ioc_types::{self}, store::models::FileAnalysisReport};
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct FileForAnalysis {
@@ -17,7 +15,7 @@ pub struct FileForAnalysis {
 pub struct EventsFromAnalysis {
     pub file_hash: String,
     pub analysis_id: String,
-    pub events: Vec<dast_event_types::Event>
+    pub iocs: Vec<dast_ioc_types::IoC>
 }
 
 // HTTP types
@@ -34,12 +32,23 @@ pub struct GenericErrorResponse {
 #[derive(Deserialize, Serialize)]
 pub struct FileUploadResponse {
     pub msg: String,
-    pub file_hash: String
+    pub file_hash: String,
+    pub file_analysis_report_uid: String
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct GetFileReport {
-    pub file: FileAnalysisReport,
+    pub file_report: FileAnalysisReport,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct GetFileReports {
+    pub file_reports: Vec<FileAnalysisReport>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct DeleteFileReport {
+    pub file_reports_deleted: u64,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -51,7 +60,11 @@ pub enum Responses {
     #[serde(rename = "body")]
     FileUploadResponse(FileUploadResponse),
     #[serde(rename = "body")]
-    GetFileReport(GetFileReport)
+    GetFileReport(GetFileReport),
+    #[serde(rename = "body")]
+    GetFileReports(GetFileReports),
+    #[serde(rename = "body")]
+    DeleteFileReport(DeleteFileReport)
 }
 
 #[derive(Deserialize, Serialize)]

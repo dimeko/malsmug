@@ -171,6 +171,7 @@ impl<'a> analyzer::SastAnalyze<'a> for SastAnalyzer {
         let mut _interesting_findings: Vec<analyzer::Finding> = _interesting_findings_iter.iter().map(|_it| {
             return analyzer::Finding {
                 r#type: analyzer::AnalysisType::Static,
+                executed_on: "".to_string(),
                 poc: _it.poc.clone(),
                 severity: _it.severity.clone(),
                 title: _it.title.to_string()

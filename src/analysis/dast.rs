@@ -12,7 +12,7 @@ use crate::analysis::analyzer::Finding;
 use crate::store::models::FileAnalysisReport;
 use crate::utils;
 use crate::analysis::analyzer;
-use crate::analysis::dast_event_types;
+use crate::analysis::dast_ioc_types;
 
 const KNOWN_SENSITIVE_DATA_KEYS: [&str; 5] = [
     "ASPSESSIONID",
@@ -190,26 +190,27 @@ impl DastAnalyzer {
 }
 
 impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
-    async fn analyze(&mut self, _: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String> {
+    async fn analyze(&mut self, _: FileAnalysisReport, iocs: Vec<dast_ioc_types::IoC>) -> Result<Vec<Finding>, String> {
         // ---------------------------------------------------
         // dynamic analysis
         //
         // parse and examine every line of the stdout
         // this is a simple method at the moment.  In future versions
-        // we can send events in and out of the sandbox by running a server
+        // we can send iocs in and out of the sandbox by running a server
         // on the host
         let mut findings: Vec<Finding> = Vec::new();
         
-        for event in events {
+        for event in iocs {
             // let inner_self = &mut self.clone();
             match event.clone().value {
-                dast_event_types::EventValue::EventHttpRequest(_v) => {
+                dast_ioc_types::IoCValue::IoCHttpRequest(_v) => {
                     // analysis: check response url domain reputation
                     let _score = self._get_domain_reputation(_v.url.as_str()).await;
                     if _score <= 20.0 && _score > 0.0 {
                         findings.push(
                                 analyzer::Finding {
-                                    r#type: analyzer::AnalysisType::Dynamic, 
+                                    r#type: analyzer::AnalysisType::Dynamic,
+                                    executed_on: event.executed_on.clone(),
                                     severity: analyzer::Severity::High,
                                     poc: _v.url,
                                     title: "bad reputation url called".to_string()
@@ -221,20 +222,22 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     if _v.data.contains("fake_input_from_sandbox_") {
                         findings.push(
                             analyzer::Finding {
-                                r#type: analyzer::AnalysisType::Dynamic, 
+                                r#type: analyzer::AnalysisType::Dynamic,
+                                executed_on: event.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.data,
                                 title: "http request sent containing user input data".to_string()
                             });
                     }
                 },
-                dast_event_types::EventValue::EventHttpResponse(_v) => {
+                dast_ioc_types::IoCValue::IoCHttpResponse(_v) => {
                     // analysis: check response url domain reputation
                     let _score = self._get_domain_reputation(_v.url.as_str()).await;
                     if _score <= 20.0 && _score > 0.0 {
                         findings.push(
                             analyzer::Finding {
-                                r#type: analyzer::AnalysisType::Dynamic, 
+                                r#type: analyzer::AnalysisType::Dynamic,
+                                executed_on: event.executed_on.clone(), 
                                 severity: analyzer::Severity::High,
                                 poc: _v.url,
                                 title: "bad reputation url called".to_string()
@@ -242,25 +245,27 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     }
 
                 },
-                dast_event_types::EventValue::EventNewHtmlElement(_v) => {
+                dast_ioc_types::IoCValue::IoCNewHtmlElement(_v) => {
                     // analysis: check if the target creates new html elements that can potentially access the internet
                     if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
                         findings.push(
                             analyzer::Finding {
-                                r#type: analyzer::AnalysisType::Dynamic, 
+                                r#type: analyzer::AnalysisType::Dynamic,
+                                executed_on: event.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.element_type,
                                 title: "dangerous html element created".to_string()
                             });
                     }
                 },
-                dast_event_types::EventValue::EventFunctionCall(_v) => {
+                dast_ioc_types::IoCValue::IoCFunctionCall(_v) => {
                     // analysis: check document.write call with the first argument being an html-like element
                     if matches!(_v.callee.as_str(), "document.write") && _v.arguments.len() > 0 {
                         if utils::contains_html_like_code(_v.arguments[0].as_str()) {
                             findings.push(
                                 analyzer::Finding {
-                                    r#type: analyzer::AnalysisType::Dynamic, 
+                                    r#type: analyzer::AnalysisType::Dynamic,
+                                    executed_on: event.executed_on.clone(), 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: _v.callee,
                                     title: "document.write was called with html element as parameter".to_string()
@@ -272,7 +277,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         // for now we check just the dangerous call to `.eval`
                         findings.push(
                                 analyzer::Finding {
-                                    r#type: analyzer::AnalysisType::Dynamic, 
+                                    r#type: analyzer::AnalysisType::Dynamic,
+                                    executed_on: event.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
                                 title: "window.eval was called".to_string()
@@ -281,7 +287,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         // analysis: check window.execScript call
                         findings.push(
                             analyzer::Finding {
-                                r#type: analyzer::AnalysisType::Dynamic, 
+                                r#type: analyzer::AnalysisType::Dynamic,
+                                executed_on: event.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
                                 title: "window.execScript was called".to_string()
@@ -291,7 +298,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.arguments[0].as_str()) {
                             findings.push(
                                 analyzer::Finding {
-                                    r#type: analyzer::AnalysisType::Dynamic, 
+                                    r#type: analyzer::AnalysisType::Dynamic,
+                                    executed_on: event.executed_on.clone(), 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: format!("{}({})", _v.callee, &_v.arguments[0].as_str()),
                                     title: "window.localStorage tried to access sensitive information".to_string()
@@ -299,22 +307,23 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         }
                     }
                 },
-                dast_event_types::EventValue::EventGetCookie(_v) => {
+                dast_ioc_types::IoCValue::IoCGetCookie(_v) => {
                     if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.cookie.as_str()) {
                             findings.push(
                                 analyzer::Finding {
-                                    r#type: analyzer::AnalysisType::Dynamic, 
+                                    r#type: analyzer::AnalysisType::Dynamic,
+                                    executed_on: event.executed_on.clone(), 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: "document.cookie".to_string(),
                                     title: "document.cookie tried to access sensitive data key".to_string()
                                 });
                     }
                 },
-                dast_event_types::EventValue::EventAddEventListener(_v) => {
+                dast_ioc_types::IoCValue::IoCAddEventListener(_v) => {
                     debug!("added event_listener: {}", _v.listener);
                 }
                 _ => {
-                    warn!("event of type {} was not handled", event.event_type)
+                    warn!("event of type {} was not handled", event.ioc_type)
                 }
             }
         }

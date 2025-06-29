@@ -2,7 +2,7 @@ use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{analysis::dast_event_types, store::models::FileAnalysisReport};
+use crate::{analysis::dast_ioc_types, store::models::FileAnalysisReport};
 
 #[allow(dead_code)]
 #[repr(i64)]
@@ -45,6 +45,7 @@ pub enum AnalysisType {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Finding {
     pub r#type: AnalysisType,
+    pub executed_on: String,
     pub severity: Severity,
     pub poc: String,
     pub title: String,
@@ -57,7 +58,7 @@ impl fmt::Display for Finding {
 }
 
 pub trait DastAnalyze<'a> {
-    async fn analyze(&mut self, file_report: FileAnalysisReport, events: Vec<dast_event_types::Event>) -> Result<Vec<Finding>, String>;
+    async fn analyze(&mut self, file_report: FileAnalysisReport, events: Vec<dast_ioc_types::IoC>) -> Result<Vec<Finding>, String>;
 }
 
 pub trait SastAnalyze<'a> {

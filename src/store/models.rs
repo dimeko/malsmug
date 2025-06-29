@@ -45,6 +45,23 @@ impl FileAnalysisReport {
           }  
     }
 
+    pub fn empty() -> FileAnalysisReport {
+      FileAnalysisReport {
+        name: "".to_string(),
+        file_hash: "".to_string(),
+        file_name: "".to_string(),
+        file_extension: "".to_string(),
+        last_analysis_id: "".to_string(),
+        has_been_analysed: false,
+        dynamic_analysis: false,
+        static_analysis: false,
+        severity: 0,
+        findings: Vec::new(),
+        bait_websites: Vec::new(),
+        uid: None
+      }  
+    }
+
     pub fn copy_no_uid(&self) -> FileAnalysisReport {
         FileAnalysisReport {
           uid: None,

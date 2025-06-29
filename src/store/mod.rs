@@ -3,7 +3,7 @@ pub mod models;
 use async_trait::async_trait;
 use log::info;
 use models::FileAnalysisReport;
-use sqlx::{migrate::MigrateDatabase, Error, Sqlite};
+use sqlx::{migrate::MigrateDatabase, Sqlite};
 
 const DATABASE_URL: &str = "sqlite:/home/dimeko/dev/malsmug/malsmug.db";
 
@@ -27,10 +27,11 @@ impl Clone for Box<dyn FileAnalysisReportStoreTrait> {
 }
 #[async_trait]
 pub trait FileAnalysisReportStoreTrait: Send + Sync + FileAnalysisReportStoreTraitClone {
-    async fn create_file_report(&self, report: FileAnalysisReport) -> anyhow::Result<()>;
-    async fn get_file_report_by_file_hash(&self, hash: &str) -> Option<FileAnalysisReport>;
+    async fn create_file_report(&self, report: FileAnalysisReport) -> Result<FileAnalysisReport, String>;
+    async fn get_file_reports_by_file_hash(&self, hash: &str) -> Option<Vec<FileAnalysisReport>>;
     async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport>;
     async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> anyhow::Result<()>;
+    async fn delete_file_report(&self, uid: &str) -> Option<u64>;
 }
 
 #[derive(Clone)]

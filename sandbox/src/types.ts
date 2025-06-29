@@ -24,7 +24,7 @@ interface RabbitMQConfig {
     }
 }
 
-const enum EventType {
+const enum IoCType {
     HttpRequest = "http_request",
     HttpResposne = "http_response",
     FunctionCall = "function_call",
@@ -35,74 +35,75 @@ const enum EventType {
     AddEventListener = "add_event_listener"
 }
 
-type EventHttpRequest = {
+type IoCHttpRequest = {
     method: string,
     url: string,
     data: string
 }
 
-type EventHttpResponse = {
+type IoCHttpResponse = {
     status: String,
     url: string,
     data: string
 }
 
-type EventConsoleLog = {
+type IoCConsoleLog = {
     text: string
 }
 
-type EventFunctionCall = {
+type IoCFunctionCall = {
     callee: string,
     arguments: string[]
 }
 
-type EventNewHtmlElement = {
+type IoCNewHtmlElement = {
     elementType: string
 }
 
-type EventSetCookie = {
+type IoCSetCookie = {
     cookie: string
 }
 
-type EventGetCookie = {
+type IoCGetCookie = {
     cookie: string
 }
 
-type EventAddEventListener = {
+type IoCAddEventListener = {
     listener: string
 }
 
-type Event = {
-    type: EventType,
+type IoC = {
+    type: IoCType,
+    executed_on: string,
     timestamp: number,
-    value: EventHttpRequest | 
-        EventFunctionCall | 
-        EventNewHtmlElement | 
-        EventSetCookie | 
-        EventGetCookie | 
-        EventHttpResponse | 
-        EventConsoleLog | 
-        EventAddEventListener,
+    value: IoCHttpRequest | 
+        IoCFunctionCall | 
+        IoCNewHtmlElement | 
+        IoCSetCookie | 
+        IoCGetCookie | 
+        IoCHttpResponse | 
+        IoCConsoleLog | 
+        IoCAddEventListener,
 }
 
-type EventsFromAnalysis = {
+type IoCsFromAnalysis = {
     file_hash: string,
     analysis_id: string,
-    events: Event[]
+    iocs: IoC[]
 }
 
 export {
-    Event,
-    EventType,
-    EventHttpRequest, 
-    EventFunctionCall, 
-    EventNewHtmlElement, 
-    EventSetCookie, 
-    EventGetCookie, 
-    EventHttpResponse, 
-    EventConsoleLog, 
-    EventAddEventListener,
-    EventsFromAnalysis,
+    IoC,
+    IoCType,
+    IoCHttpRequest, 
+    IoCFunctionCall, 
+    IoCNewHtmlElement, 
+    IoCSetCookie, 
+    IoCGetCookie, 
+    IoCHttpResponse, 
+    IoCConsoleLog, 
+    IoCAddEventListener,
+    IoCsFromAnalysis,
     RabbitMQConfig,
     RabbitMQQueue,
     RabbitMQExchange

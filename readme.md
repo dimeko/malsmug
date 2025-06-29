@@ -64,6 +64,5 @@ Some identifiers from `oxc` Abstract Syntax Tree:
 - suspicious form input data sent with HTTP request
 
 #### todo
-- add more keys to known `KNOWN_SENSITIVE_DATA_KEYS` (eg `ASP.NET` cookie)
-- explore how hooks to event listeners could be used (for now all `addEventListener` calls are hooked)
-- hook `window.sessionStorage`
+- rename `file_analysis_report.has_been_analysed`
+- use only `file_analysis_report` and not `file_analysis` or `file_report` in FileAnalysisReport variables

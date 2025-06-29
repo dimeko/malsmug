@@ -19,6 +19,7 @@
     "commander": "^13.1.0",
     "figlet": "^1.8.0",
     "js-sha256": "^0.11.1",
+    "log4js": "^6.9.1",
     "path": "^0.12.7",
     "puppeteer": "^24.4.0",
     "random-string-generator": "^1.0.7",

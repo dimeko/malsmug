@@ -2,9 +2,11 @@ import amqplib, { GetMessage } from 'amqplib';
 import * as types from "./types";
 
 class RBMQ {
-    // not used at the moment
+    // --------------------------------------------------------
+    // host and port not used at the currently
     private host: string;
     private port: number;
+    // --------------------------------------------------------
     private username: string;
     private password: string;
 
@@ -43,6 +45,10 @@ class RBMQ {
         await this.channel.assertQueue(queue, { durable: true, autoDelete: true });
         let json_data: string = JSON.stringify(msg)
         this.channel.sendToQueue(queue, Buffer.from(json_data));
+    }
+
+    async close() {
+        await this.channel?.close()
     }
 
     // async consume(queue: string, cb: (bytesAsString: Buffer<ArrayBufferLike>) => void) {

@@ -6,7 +6,19 @@ from pathlib import Path
 import msgpack
 import subprocess
 import time
+from datetime import datetime
 import yaml
+import logging
+
+logger = logging.getLogger(__name__)
+
+def validate_log_level(lv: str) -> str:
+    if lv == 'debug': return logging.DEBUG
+    elif lv == 'info': return logging.INFO
+    elif lv == 'warn': return logging.WARN
+    elif lv == 'warning': return logging.WARN
+    elif lv == 'error': return logging.ERROR
+    else: return logging.INFO
 
 @dataclass
 class FileForAnalysis:
@@ -17,18 +29,17 @@ class FileForAnalysis:
     file_bytes: bytes
         
 def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
-    print("running consumer")
+    logger.info("running consumer")
     Path(samples_dir).mkdir(parents=True, exist_ok=True)
     
-    print("samples dir:", samples_dir)
-    print("sandbox dir:", sandbox_lib)
-    print("config folder: ", config_folder)
-    print("bait website:", bait_website)
+    logger.info("samples dir:", samples_dir)
+    logger.info("sandbox dir:", sandbox_lib)
+    logger.info("config folder: ", config_folder)
+    logger.info("bait website:", bait_website)
 
     # channel, method, properties, body
     def on_message(channel, method, props, body):
         try:
-            print("got message")
             # m = hashlib.sha256()
             # m.update(body)
             # digest = m.hexdigest()
@@ -43,17 +54,18 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
                     file_bytes=file_for_analysis_raw[4]
                 )
             except msgpack.FormatError as e:
-                print("data received from queue is not valid msgpack bytes")
+                logger.warning("data received from queue is not valid msgpack bytes")
                 return
             
-            print("file_for_analysis: ", file_for_analysis.file_name)
+            logger.debug("file_for_analysis: ", file_for_analysis.file_name)
             if isinstance(file_for_analysis, FileForAnalysis):
                 channel.basic_ack(delivery_tag=method.delivery_tag)
+                dt = datetime.now()
                 # looping with index
                 for idx, bw in enumerate(file_for_analysis.bait_websites):
                     # adding the index of the loop as suffix to create different files for every analysis
                     # this does not mess with the javascript analyzer state and makes the analyses independent
-                    samples_file_path = samples_dir + "/" + file_for_analysis.file_hash + "_" + str(idx)
+                    samples_file_path = samples_dir + "/" + file_for_analysis.file_hash + "_" + str(dt.microsecond) + "_" + str(idx)
                     with open(samples_file_path, "w") as f:
                         byte_string = ""
                         for b in file_for_analysis.file_bytes:
@@ -63,7 +75,7 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
                         ["node", sandbox_lib, samples_file_path, bw, config_folder, file_for_analysis.analysis_id],
                         stdin=None, stdout=None, stderr=None)
         except Exception as e:
-            print("error processing message: ", e)
+            logger.error("error processing message: ", e)
         
     config = {}
     with open("/sandbox/config/rabbitmq.yaml", "r") as f:
@@ -80,7 +92,7 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
             )
         )
     except Exception as e:
-        print("could not load configuration")
+        logger.error("could not load configuration")
         os._exit(1)
         
     while True:
@@ -98,10 +110,10 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
             break
         except Exception as e:
             sec = 5
-            print(f"error connecting, trying again in {sec} ...")
+            logger.error(f"error connecting, trying again in {sec} ...")
             time.sleep(sec)
         
-    print("start consuming from RabbitMQ")
+    logger.info("start consuming from RabbitMQ")
     while True:
         try:
             channel.basic_qos(prefetch_count=1)
@@ -112,13 +124,15 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
 
             channel.start_consuming()
         except Exception as err:
-            print("Error while consuming: ", err)
+            logger.error("Error while consuming: ", err)
             if channel.is_closed:
-                print("Bye!")
+                logger.info("Bye!")
                 break
 
 
 if __name__ == "__main__":
+    logger.setLevel(validate_log_level(os.environ['LOG_LEVEL']))
+
     parser = ArgumentParser(
                     prog='Sandbox',
                     description='RabbitMQ consumer')
@@ -129,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument('--bait-website', default="https://facebook.com")
 
     args = parser.parse_args()
-    print("Parsed flags: ", args)
+    logger.info("parsed flags: ", args)
     run(
         samples_dir=args.samples_dir,
         sandbox_lib=args.sandbox_lib,
