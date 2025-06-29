@@ -50,20 +50,6 @@ class RBMQ {
     async close() {
         await this.channel?.close()
     }
-
-    // async consume(queue: string, cb: (bytesAsString: Buffer<ArrayBufferLike>) => void) {
-    //     if(this.channel == null) return null
-    //     await this.channel.assertQueue(queue, { durable: true, autoDelete: true });
-    //     this.channel.get(queue, {
-    //         noAck: false
-    //     }).then(async (getMsg: GetMessage | false) => {
-    //         if(!getMsg) {return} 
-    //         await cb(getMsg.content)
-    //         this.channel?.ack(getMsg, false)
-    //     }).catch((err) => {
-    //         console.log("[analysis-debug] Got error from queue: ", err)
-    //     })
-    // } 
 }
 
 export {

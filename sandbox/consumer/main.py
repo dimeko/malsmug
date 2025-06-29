@@ -29,21 +29,16 @@ class FileForAnalysis:
     file_bytes: bytes
         
 def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
-    logger.info("running consumer")
+    logger.info("running consumer ...")
     Path(samples_dir).mkdir(parents=True, exist_ok=True)
     
-    logger.info("samples dir:", samples_dir)
-    logger.info("sandbox dir:", sandbox_lib)
-    logger.info("config folder: ", config_folder)
-    logger.info("bait website:", bait_website)
+    logger.debug("samples dir:", samples_dir)
+    logger.debug("sandbox dir:", sandbox_lib)
+    logger.debug("config folder: ", config_folder)
+    logger.debug("bait website:", bait_website)
 
-    # channel, method, properties, body
-    def on_message(channel, method, props, body):
+    def on_message(channel, method, _, body):
         try:
-            # m = hashlib.sha256()
-            # m.update(body)
-            # digest = m.hexdigest()
-            
             try:
                 file_for_analysis_raw = msgpack.unpackb(body)                
                 file_for_analysis = FileForAnalysis(
@@ -60,9 +55,16 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
             logger.debug("file_for_analysis: ", file_for_analysis.file_name)
             if isinstance(file_for_analysis, FileForAnalysis):
                 channel.basic_ack(delivery_tag=method.delivery_tag)
+                # retrieving the current time and using it later in microseconds precision
+                # because the same consumer creates multiple copies of the same file for analysis
+                # on the same filesystem. The analyser removes the sample after analysis so we 
+                # must create a dedicated sample copy for every analyser to avoid having to deal
+                # with selective sample copy deletion
                 dt = datetime.now()
+
                 # looping with index
                 for idx, bw in enumerate(file_for_analysis.bait_websites):
+
                     # adding the index of the loop as suffix to create different files for every analysis
                     # this does not mess with the javascript analyzer state and makes the analyses independent
                     samples_file_path = samples_dir + "/" + file_for_analysis.file_hash + "_" + str(dt.microsecond) + "_" + str(idx)
@@ -132,7 +134,6 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
 
 if __name__ == "__main__":
     logger.setLevel(validate_log_level(os.environ['LOG_LEVEL']))
-
     parser = ArgumentParser(
                     prog='Sandbox',
                     description='RabbitMQ consumer')

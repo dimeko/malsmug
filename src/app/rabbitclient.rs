@@ -14,7 +14,7 @@ use crate::bootstrap::rabbitmq_conf;
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait Queue: Sync + Send {
+pub trait RBMQ: Sync + Send {
     async fn consume(&self, queue: &str) -> Result<Consumer, Error>;
     async fn publish(&self, queue: &str, exchange: &str, data: Vec<u8>) -> Result<PublisherConfirm, Error>;
     fn get_core_files_queue(&self) -> &str;
@@ -51,7 +51,6 @@ impl RabbitMQExchangeConf {
         }
     }
 }
-
 
 #[derive(Clone)]
 pub struct RabbitMQConfig {
@@ -160,7 +159,7 @@ impl RabbitMQ {
 }
 
 #[async_trait]
-impl Queue for RabbitMQ {
+impl RBMQ for RabbitMQ {
     async fn consume(&self, queue: &str) -> Result<Consumer, Error> {
         let consume_args = BasicConsumeOptions {
             no_ack: false,

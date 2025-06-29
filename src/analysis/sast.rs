@@ -178,7 +178,6 @@ impl<'a> analyzer::SastAnalyze<'a> for SastAnalyzer {
             }
         }).collect();
         findings.append(&mut _interesting_findings);
-        // self.findings.append(_interesting_findings);
         // ...
         // end of analysis
         // ---------------------------------------------------

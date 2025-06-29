@@ -89,7 +89,7 @@ impl DastAnalyzer {
     async fn _get_domain_reputation(&mut self, url: &str) -> f32 {
         let url_normalized: String = self._normalize_url(url);
 
-        info!("_get_domain_reputation url: {}", url_normalized);
+        info!("get domain reputation for: {}", url_normalized);
         let domain = match Url::parse(&url_normalized) {
             Ok(_u) => {
                 _u
@@ -99,6 +99,7 @@ impl DastAnalyzer {
                 return -1.0;
             }
         };
+        // load all public suffixes to achieve parsing arbitrary urls 
         let mut public_suffixes = match File::open("./public_suffix.txt") {
             Ok(_f) => _f,
             Err(_e) => {
@@ -115,6 +116,7 @@ impl DastAnalyzer {
                 return -1.0;
             }
         };
+        // parse the given url's domain
         let domain = match list.domain(domain.host_str().unwrap_or("").as_bytes()) {
             Some(_d) => _d,
             None => {
@@ -131,6 +133,7 @@ impl DastAnalyzer {
             }
         };
 
+        // get the domain reputation from the cache
         if self.cached_domain_reputations.contains_key(domain_string) {
             return match self.cached_domain_reputations.get(domain_string) {
                 Some(_s) => {
@@ -147,6 +150,7 @@ impl DastAnalyzer {
             return -1;
         });
         info!("checking domain: {}", domain_string);
+        // TODO: move this url to a configuration file
         let spamhaus_url = format!("https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/{}/overview", domain_string);
 
         let _client = reqwest::Client::new();

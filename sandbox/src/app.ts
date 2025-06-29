@@ -52,14 +52,18 @@ if (!fs.existsSync(sampleFile)) {
     logger.info("[analysis-debug] Launched ...");
     const page = await browser.newPage();
 
+    // visiting bait_websites
     await page.goto(baitWebsite);
     logger.info("[analysis-debug] Hooking JavaScript APIs...");
 
     page.on('console', message => {
-                logger.debug(`[dom-console]: ${message.text()}`);
-        })
+        logger.debug(`[dom-console]: ${message.text()}`);
+    })
+
     let events: types.IoC[] = [];
 
+    // a random string suffix is created every time the analyser runs to make
+    // sure Javascript cannot find and call our hook and mess with the analyser
     var random_string = rsg()
     var reportIocFunctionName = 'reportIoC' + random_string;
     logger.info('[analysis-debug] report Ioc function name:', reportIocFunctionName);
@@ -75,21 +79,30 @@ if (!fs.existsSync(sampleFile)) {
     });
     const place_hooks_source_code = place_hooks.toString();
 
+    // we have to also set a random string suffix at the name of the place_hooks function
+    // as Javascript can interact with it as soon as it is placed in the browser and possibly
+    // prevent hooking!
     try {
         let place_hooks_wrapper = `
             ${place_hooks_source_code}
 
             place_hooks("${reportIocFunctionName}")
         `;
+        // set the hooks in the browser
         await page.evaluate(place_hooks_wrapper);
         logger.info(`[analysis-debug] Executing script`);   
-        const scriptCode = fs.readFileSync(sampleFile, "utf-8");         
+    
+        // open the sample copy
+        const scriptCode = fs.readFileSync(sampleFile, "utf-8");    
+        // run the sample file in the browser     
         await page.evaluate(scriptCode);
         
-        logger.info(`[analysis-debug] Executing Lure`);            
+        logger.info(`[analysis-debug] Executing Lure`);  
+        // run the Lure          
         const lure = new Lure(page)
         logger.info(`[analysis-debug] Starting Lure`);
         await lure.start_lure()
+
         logger.info(`[analysis-debug] Finishing Lure`);
         setTimeout(async () => { 
             let event_for_analysis: types.IoCsFromAnalysis = {

@@ -1,5 +1,8 @@
 import { Page } from "puppeteer";
 
+// Lure tries to trigger possibly hidden functionalities
+// of the sample by performing actions on the page 
+// (e.g. submit the form found on the loaded page)
 class Lure {
     private page: Page;
  
@@ -7,6 +10,7 @@ class Lure {
         this.page = page;
     }
 
+    // find a form, place dummy input and submit it
     private async _forms_lure() {
         const inputs = await this.page.$$("input");
         for (const _i in inputs) {

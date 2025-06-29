@@ -1,6 +1,5 @@
 pub mod sqlite;
 pub mod models;
-use thiserror::Error;
 use async_trait::async_trait;
 use log::info;
 use models::FileAnalysisReport;

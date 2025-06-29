@@ -34,7 +34,7 @@ use store::Store;
 #[derive(Clone)]
 struct ApiContext {
     store: Arc<Store>,
-    queue: Arc<dyn 'static + Send + rabbitclient::Queue>
+    queue: Arc<dyn 'static + Send + rabbitclient::RBMQ>
 }
 
 pub trait AppMethods {
@@ -44,11 +44,11 @@ pub trait AppMethods {
 pub struct App {
     bindhost: String,
     store: Store,
-    queue: Arc<dyn rabbitclient::Queue + Send + Sync> // rabbitclient::Queue is supposed to move to a more abstract queue mod
+    queue: Arc<dyn rabbitclient::RBMQ + Send + Sync>
 }
 
 impl App {
-    pub async fn new(h: String, q: Box<dyn rabbitclient::Queue + Send + Sync>) -> Self {
+    pub async fn new(h: String, q: Box<dyn rabbitclient::RBMQ + Send + Sync>) -> Self {
         let store = Store::new("sqlite").await;
         Self {
             bindhost: h.clone(),
