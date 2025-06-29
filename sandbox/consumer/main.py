@@ -131,7 +131,6 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
                 logger.info("Bye!")
                 break
 
-
 if __name__ == "__main__":
     logger.setLevel(validate_log_level(os.environ['LOG_LEVEL']))
     parser = ArgumentParser(

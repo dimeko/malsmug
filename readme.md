@@ -73,7 +73,7 @@ Finally everything is running. Now you can submit files to the application api a
             }
         }
       }
-      ```
+    ```
 
 - Retrieve analysis reports for a specific file hash:
 

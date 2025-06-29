@@ -54,4 +54,3 @@ RUN mkdir samples
 ENV PUPPETEER_CACHE_DIR="/sandbox/puppeteer_cache"
 
 ENTRYPOINT ["/sandbox_entrypoint.sh"]
-# CMD ["./default/default.js"]
