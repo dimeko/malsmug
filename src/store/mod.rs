@@ -1,5 +1,6 @@
 pub mod sqlite;
 pub mod models;
+use thiserror::Error;
 use async_trait::async_trait;
 use log::info;
 use models::FileAnalysisReport;
@@ -25,13 +26,24 @@ impl Clone for Box<dyn FileAnalysisReportStoreTrait> {
         self.clone_box()
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error("record not found")]
+    NotFoundError,
+    #[error("generic db error: {0}")]
+    GenericError(String),
+}
+
+type StoreResult<T> = std::result::Result<T, StoreError>;
 #[async_trait]
 pub trait FileAnalysisReportStoreTrait: Send + Sync + FileAnalysisReportStoreTraitClone {
-    async fn create_file_report(&self, report: FileAnalysisReport) -> Result<FileAnalysisReport, String>;
-    async fn get_file_reports_by_file_hash(&self, hash: &str) -> Option<Vec<FileAnalysisReport>>;
-    async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport>;
-    async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> anyhow::Result<()>;
-    async fn delete_file_report(&self, uid: &str) -> Option<u64>;
+    async fn create_file_report(&self, report: FileAnalysisReport) -> StoreResult<FileAnalysisReport>;
+    async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> StoreResult<FileAnalysisReport>;
+    async fn get_file_reports_by_file_hash(&self, hash: &str) -> StoreResult<Vec<FileAnalysisReport>>;
+    async fn get_file_report(&self, uid: &str) -> StoreResult<FileAnalysisReport>;
+    async fn delete_file_reports_by_hash(&self, hash: &str) -> StoreResult<u64>;
+    async fn delete_file_report(&self, uid: &str) -> StoreResult<u64>;
 }
 
 #[derive(Clone)]

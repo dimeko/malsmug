@@ -2006,6 +2006,7 @@ dependencies = [
  "serde_yaml",
  "sha256",
  "sqlx",
+ "thiserror",
  "tokio",
  "url 2.5.4",
  "uuid",

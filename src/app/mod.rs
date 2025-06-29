@@ -26,7 +26,7 @@ use crate::{
     analysis::{
         analyzer::{self, DastAnalyze, Finding, SastAnalyze, Severity},dast::DastAnalyzer, sast::{self}},
     app::types::EventsFromAnalysis,
-    store::{self, models::FileAnalysisReport},
+    store::{self, models::FileAnalysisReport, StoreError},
     utils
 };
 use store::Store;
@@ -37,31 +37,30 @@ struct ApiContext {
     queue: Arc<dyn 'static + Send + rabbitclient::Queue>
 }
 
-pub trait ServerMethods<'a> {
-    // async fn analyse_file(self, multipart: Multipart) -> (StatusCode, Json<Response<'a>>) ;
+pub trait AppMethods {
     async fn start(&self) -> anyhow::Result<()>;
 }
 
-pub struct Server<'a> {
-    bindhost: &'a str,
+pub struct App {
+    bindhost: String,
     store: Store,
     queue: Arc<dyn rabbitclient::Queue + Send + Sync> // rabbitclient::Queue is supposed to move to a more abstract queue mod
 }
 
-impl<'a> Server<'a> {
-    pub async fn new(h: &'a str, q: Box<dyn rabbitclient::Queue + Send + Sync>) -> Self {
+impl App {
+    pub async fn new(h: String, q: Box<dyn rabbitclient::Queue + Send + Sync>) -> Self {
         let store = Store::new("sqlite").await;
         Self {
-            bindhost: h,
+            bindhost: h.clone(),
             store,
             queue: Arc::from(q)
         }
     }
 }
 
-async fn delete_file_report(Extension(ctx): Extension<ApiContext>, Path(file_report_uid): Path<String>) -> impl IntoResponse {
-    let r = match ctx.store.db.file_analysis_report.delete_file_report(&file_report_uid).await {
-        Some(r) => {
+async fn delete_file_reports_by_hash(Extension(ctx): Extension<ApiContext>, Path(file_hash): Path<String>) -> impl IntoResponse {
+    let r = match ctx.store.db.file_analysis_report.delete_file_reports_by_hash(&file_hash).await {
+        Ok(r) => {
             (StatusCode::OK, Json(
                     types::Response{
                             r:  types::Responses::DeleteFileReport(
@@ -73,15 +72,72 @@ async fn delete_file_report(Extension(ctx): Extension<ApiContext>, Path(file_rep
                         )
                     )
         },
-        None => {
-            (StatusCode::NOT_FOUND, Json(
-                types::Response{
-                        r:  types::Responses::GenericErrorResponse(
-                                types::GenericErrorResponse { msg: format!("Error deleting file {:?}", file_report_uid) }
+        Err(e) => {
+            match &e {
+                StoreError::NotFoundError => {
+                    (StatusCode::NOT_FOUND, Json(
+                        types::Response{
+                                r:  types::Responses::GenericErrorResponse(
+                                        types::GenericErrorResponse { msg: format!("Entry not found") }
+                                    )
+                                }
                             )
-                        }
+                        )
+                },
+                _ => {
+                    (StatusCode::BAD_REQUEST, Json(
+                        types::Response{
+                                r:  types::Responses::GenericErrorResponse(
+                                        types::GenericErrorResponse { msg: format!("Error deleting file reports. Error: {:?}", e.to_string()) }
+                                    )
+                                }
+                            )
+                        )
+                }
+            }
+        }
+    };
+    r
+}
+
+
+async fn delete_file_report(Extension(ctx): Extension<ApiContext>, Path(file_report_uid): Path<String>) -> impl IntoResponse {
+    let r = match ctx.store.db.file_analysis_report.delete_file_report(&file_report_uid).await {
+        Ok(r) => {
+            (StatusCode::OK, Json(
+                    types::Response{
+                            r:  types::Responses::DeleteFileReport(
+                                    types::DeleteFileReport {
+                                        file_reports_deleted: r
+                                    }
+                                )
+                            }
+                        )
                     )
-                )
+        },
+        Err(e) => {
+            match &e {
+                StoreError::NotFoundError => {
+                    (StatusCode::NOT_FOUND, Json(
+                        types::Response{
+                                r:  types::Responses::GenericErrorResponse(
+                                        types::GenericErrorResponse { msg: format!("Entries not found") }
+                                    )
+                                }
+                            )
+                        )
+                },
+                _ => {
+                    (StatusCode::BAD_REQUEST, Json(
+                        types::Response{
+                                r:  types::Responses::GenericErrorResponse(
+                                        types::GenericErrorResponse { msg: format!("Error deleting file reports. Error: {:?}", e.to_string()) }
+                                    )
+                                }
+                            )
+                        )
+                }
+            }
         }
     };
     r
@@ -89,7 +145,7 @@ async fn delete_file_report(Extension(ctx): Extension<ApiContext>, Path(file_rep
 
 async fn get_file_reports(Extension(ctx): Extension<ApiContext>, Path(file_hash): Path<String>) -> impl IntoResponse {
     let r = match ctx.store.db.file_analysis_report.get_file_reports_by_file_hash(file_hash.as_str()).await {
-            Some(r) => {
+            Ok(r) => {
                 debug!("{} file analysis reports found", r.len());
                 (StatusCode::OK, Json(
                     types::Response{
@@ -102,12 +158,29 @@ async fn get_file_reports(Extension(ctx): Extension<ApiContext>, Path(file_hash)
                         )
                     )
             }
-            None => {
-                (StatusCode::NOT_FOUND, Json(types::Response{
-                    r:  types::Responses::GenericErrorResponse (
-                            types::GenericErrorResponse { msg: format!("Error getting file report. File hash does not exist") }
-                        )
-                } ))
+            Err(e) => {
+                match &e {
+                    StoreError::NotFoundError => {
+                        (StatusCode::NOT_FOUND, Json(
+                            types::Response{
+                                    r:  types::Responses::GenericErrorResponse(
+                                            types::GenericErrorResponse { msg: format!("Entries not found") }
+                                        )
+                                    }
+                                )
+                            )
+                    },
+                    _ => {
+                        (StatusCode::BAD_REQUEST, Json(
+                            types::Response{
+                                    r:  types::Responses::GenericErrorResponse(
+                                            types::GenericErrorResponse { msg: format!("Error deleting file reports. Error: {:?}", e.to_string()) }
+                                        )
+                                    }
+                                )
+                            )
+                    }
+                }
             }
         };
     r
@@ -216,7 +289,7 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
     if static_analysis {
         let mut static_analyser = sast::SastAnalyzer::new();
         match ctx.store.db.file_analysis_report.get_file_report(file_analysis_report.uid.clone().unwrap().as_str()).await {
-            Some(mut r) => {
+            Ok(mut r) => {
                 match static_analyser.analyze(r.to_owned(), total_file_bytes) {
                     Ok(mut f) => {
                         info!("found {} findings for {:?}", f.len(), r.clone().file_name);
@@ -267,12 +340,26 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
                     }
                 };
             },
-            None => {
-                return (StatusCode::BAD_REQUEST, Json(types::Response{
-                    r:  types::Responses::GenericErrorResponse (
-                            types::GenericErrorResponse { msg: format!("Could not find newlly created file report entry.") }
-                        )
-                } ))
+            Err(e) => {
+                match &e {
+                    StoreError::NotFoundError => {
+                        return (StatusCode::NOT_FOUND, Json(
+                            types::Response{
+                                    r:  types::Responses::GenericErrorResponse(
+                                            types::GenericErrorResponse { msg: format!("Entries not found") }
+                                        )
+                                    }
+                                )
+                            )
+                    },
+                    _ => {
+                        return (StatusCode::BAD_REQUEST, Json(types::Response{
+                            r:  types::Responses::GenericErrorResponse (
+                                    types::GenericErrorResponse { msg: format!("Could not find newlly created file report entry.") }
+                                )
+                        } ))
+                    }
+                }
             }
         }
     }
@@ -291,7 +378,7 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
     )
 }
 
-impl<'a> ServerMethods<'a> for Server<'a> {
+impl AppMethods for App {
     // async 
     async fn start(&self) -> anyhow::Result<()> {
         let inner_queue = self.queue.clone();
@@ -299,6 +386,7 @@ impl<'a> ServerMethods<'a> for Server<'a> {
         let app = Router::new()
             .route("/analyse-file", post(analyse_file))
             .route("/delete-file-report/{file_report_uid}", delete(delete_file_report))
+            .route("/delete-file-reports/{file_hash}", delete(delete_file_reports_by_hash))
             .route("/get-file-reports/{file_hash}", get(get_file_reports))
             .route_layer(
                 Extension(ApiContext {
@@ -348,9 +436,17 @@ impl<'a> ServerMethods<'a> for Server<'a> {
                                         let file_reports_with_the_same_hash = match inner_store.db
                                             .file_analysis_report
                                             .get_file_reports_by_file_hash(events_for_analysis.file_hash.as_str()).await {
-                                                Some(r) => r,
-                                                None => {
-                                                    error!("report does not exist in database, aborting");
+                                                Ok(r) => r,
+                                                Err(e) => {
+                                                    match &e {
+                                                        StoreError::NotFoundError => {
+                                                            error!("report does not exist in database, aborting");
+                                                            continue;
+                                                        }
+                                                        _ => {
+                                                            error!("generic db error: {:?}", e);
+                                                        }
+                                                    };
                                                     continue;
                                                 }
                                             };
@@ -436,7 +532,7 @@ impl<'a> ServerMethods<'a> for Server<'a> {
             });
 
         // run our app with hyper, listening globally on port 3000
-        let listener = tokio::net::TcpListener::bind(self.bindhost).await.unwrap();
+        let listener = tokio::net::TcpListener::bind(&self.bindhost).await.unwrap();
         axum::serve(listener, app).await.unwrap();
         Ok(())
     }

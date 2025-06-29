@@ -120,9 +120,9 @@ impl RabbitMQ {
             lapin::ExchangeKind::Direct, exchange_args, FieldTable::default()).await;
             
         let queue_declare_args = QueueDeclareOptions {
-            auto_delete: true,
+            auto_delete: self.conf.core_files_queue.auto_delete,
             passive: false,
-            durable: true,
+            durable: self.conf.core_files_queue.durable,
             exclusive: false,
             nowait: false
         };

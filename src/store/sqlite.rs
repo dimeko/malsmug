@@ -1,5 +1,5 @@
 
-use crate::analysis::analyzer::Finding;
+use crate::{analysis::analyzer::Finding, store::StoreResult, store::StoreError};
 
 use super::{models::FileAnalysisReport, FileAnalysisReportStoreTrait};
 use log::debug;
@@ -56,7 +56,7 @@ pub struct FileAnalysisReportRaw {
 
 #[async_trait]
 impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
-    async fn get_file_report(&self, uid: &str) -> Option<FileAnalysisReport> {
+    async fn get_file_report(&self, uid: &str) -> StoreResult<FileAnalysisReport> {
         let report_raw = sqlx::query_as!(
             FileAnalysisReportRaw, r#"SELECT uid,
                 name,
@@ -72,16 +72,25 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 findings
                 FROM file_analysis_reports WHERE uid = ?"#, uid)
             .fetch_one(&self.pool)
-            .await.ok();
+            .await;
         match report_raw {
-            Some(r) =>
-            return Some(FileAnalysisReport::from(r)),
-            None => None
+            Ok(r) =>
+                return Ok(FileAnalysisReport::from(r)),
+            Err(e) => {
+                match &e {
+                    sqlx::error::Error::RowNotFound => {
+                        return Err(StoreError::NotFoundError)
+                    },
+                    _ => {
+                        return Err(StoreError::GenericError(e.to_string()))
+                    }
+                }
+            }
         }
         
     }
 
-    async fn get_file_reports_by_file_hash(&self, hash: &str) -> Option<Vec<FileAnalysisReport>> {
+    async fn get_file_reports_by_file_hash(&self, hash: &str) -> StoreResult<Vec<FileAnalysisReport>> {
         let reports_raw = sqlx::query_as!(
             FileAnalysisReportRaw, r#"SELECT uid,
                 name,
@@ -97,22 +106,31 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 findings
                 FROM file_analysis_reports WHERE file_hash = ?"#, hash)
             .fetch_all(&self.pool)
-            .await.ok();
+            .await;
         match reports_raw {
-            Some(rws) => {
+            Ok(rws) => {
                 let mut reports: Vec<FileAnalysisReport> = Vec::new();
                 for rw in rws {
                     reports.push(FileAnalysisReport::from(rw));
                 }
-                return Some(reports);
+                return Ok(reports);
             },
-            None => None
+            Err(e) => {
+                match &e {
+                    sqlx::error::Error::RowNotFound => {
+                        return Err(StoreError::NotFoundError)
+                    },
+                    _ => {
+                        return Err(StoreError::GenericError(e.to_string()))
+                    }
+                }
+            }
         }
 
         
     }
 
-    async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> anyhow::Result<()> {
+    async fn update_file_report(&self, uid: &str, updated_file_analysis_report: FileAnalysisReport) -> StoreResult<FileAnalysisReport> {
         let json_string_findings = match serde_json::to_string::<Vec<Finding>>(&updated_file_analysis_report.findings) {
             Ok(r) => r,
             Err(_) => {
@@ -120,7 +138,7 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 String::new()
             }
         };
-        sqlx::query!(r#"UPDATE file_analysis_reports
+        let result = sqlx::query!(r#"UPDATE file_analysis_reports
                     SET has_been_analysed = ?, severity = ?, findings = ?, last_analysis_id = ? WHERE uid = ? 
                 "#,
                 updated_file_analysis_report.has_been_analysed,
@@ -130,23 +148,66 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 uid
             )
             .fetch_one(&self.pool)
-            .await.ok();
-        Ok(())
+            .await;
+        return match result {
+            Ok(_) => {
+                Ok(updated_file_analysis_report)
+            },
+            Err(e) => {
+                match &e {
+                    sqlx::error::Error::RowNotFound => {
+                        Err(StoreError::NotFoundError)
+                    },
+                    _ => {
+                        Err(StoreError::GenericError(e.to_string()))
+                    }
+                }
+            }
+        }
     }
 
-    async fn delete_file_report(&self, uid: &str) -> Option<u64> {
+    async fn delete_file_report(&self, uid: &str) -> StoreResult<u64> {
         let res = sqlx::query!(r#"DELETE FROM file_analysis_reports WHERE uid = ? "#, uid).execute(&self.pool)
-            .await.ok();
+            .await;
         return match res {
-            Some(r) => {
-                Some(r.rows_affected())
+            Ok(r) => {
+                Ok(r.rows_affected())
             },
-            None => None
+            Err(e) => {
+                match &e {
+                    sqlx::error::Error::RowNotFound => {
+                        Err(StoreError::NotFoundError)
+                    },
+                    _ => {
+                        Err(StoreError::GenericError(e.to_string()))
+                    }
+                }
+            }
+        }
+    }
+
+    async fn delete_file_reports_by_hash(&self, file_hash: &str) -> StoreResult<u64> {
+        let res = sqlx::query!(r#"DELETE FROM file_analysis_reports WHERE file_hash = ? "#, file_hash).execute(&self.pool)
+            .await;
+        return match res {
+            Ok(r) => {
+                Ok(r.rows_affected())
+            },
+            Err(e) => {
+                match &e {
+                    sqlx::error::Error::RowNotFound => {
+                        Err(StoreError::NotFoundError)
+                    },
+                    _ => {
+                        Err(StoreError::GenericError(e.to_string()))
+                    }
+                }
+            }
         }
     }
 
 
-    async fn create_file_report(&self, mut report: FileAnalysisReport) -> Result<FileAnalysisReport, String> {
+    async fn create_file_report(&self, mut report: FileAnalysisReport) -> StoreResult<FileAnalysisReport> {
         let new_uuid = Uuid::new_v4();
         report.uid = Some(new_uuid.to_string()); // TODO: generate uuid
         let comma_sep_bait_websites = report.bait_websites.join(",");
@@ -191,7 +252,7 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 return Ok(report)
             },
             Err(e) => {
-                return Err(format!("error creating new file_analysis_report: {:?}", e))
+                Err(StoreError::GenericError(e.to_string()))
             }
         }
     }

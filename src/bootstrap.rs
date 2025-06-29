@@ -1,3 +1,7 @@
+use std::path::PathBuf;
+
+use crate::{app::{self, rabbitclient, App}, bootstrap::rabbitmq_conf::RabbitMQExtConf, utils, Args};
+
 pub mod rabbitmq_conf {
     use serde::{Serialize, Deserialize};
 
@@ -38,4 +42,23 @@ pub mod rabbitmq_conf {
         pub queues: RabbitMQExtQueuesConf,
         pub exchanges: RabbitMQExtExchangesConf
     }
+}
+
+pub async fn bootstrap(args: Args) -> App {
+    let server_address: String = args.bindhost + ":" + args.bindport.to_string().as_str();
+
+    let rbmq_conf_from_file = utils::parse_yaml::
+        <RabbitMQExtConf>(PathBuf::from("./config/rabbitmq.yaml")).unwrap(); 
+
+    println!("running server on {}", server_address.clone());
+
+    let rbmqc = rabbitclient::RabbitMQ::new(
+        rbmq_conf_from_file.connection.host.clone(),
+        rbmq_conf_from_file.connection.host_port.clone(),
+        rbmq_conf_from_file.connection.username.clone(),
+        rbmq_conf_from_file.connection.password.clone(),
+        rabbitclient::RabbitMQConfig::new(rbmq_conf_from_file)
+    ).await;
+
+    app::App::new(server_address, Box::new(rbmqc)).await
 }

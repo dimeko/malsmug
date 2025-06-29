@@ -1,6 +1,4 @@
-use std::path::PathBuf;
 use clap::{Parser};
-use log::info;
 use env_logger::Builder;
 
 mod store;
@@ -9,8 +7,7 @@ mod app;
 mod analysis;
 mod bootstrap;
 
-use app::ServerMethods;
-use app::rabbitclient;
+use crate::app::AppMethods;
 
 #[derive(Parser)]
 struct Args {
@@ -38,7 +35,7 @@ struct Args {
 async fn main() {
     let mut builder = Builder::from_default_env();
 
-    let mut log_level: log::LevelFilter = log::LevelFilter::Debug;
+    let mut log_level: log::LevelFilter = log::LevelFilter::Warn;
     let cli_args = Args::parse();
 
     if cli_args.verbose {
@@ -53,21 +50,7 @@ async fn main() {
         .filter(None, log_level)
         .init();
 
-    let server_address= cli_args.bindhost + ":" + &cli_args.bindport.to_string();
+    let app = bootstrap::bootstrap(cli_args).await;
 
-    let rbmq_conf_from_file = utils::parse_yaml::
-        <bootstrap::rabbitmq_conf::RabbitMQExtConf>(PathBuf::from("./config/rabbitmq.yaml")).unwrap(); 
-
-    info!("running server on {}", server_address);
-
-    let rbmqc = rabbitclient::RabbitMQ::new(
-        rbmq_conf_from_file.connection.host.clone(),
-        rbmq_conf_from_file.connection.host_port.clone(),
-        rbmq_conf_from_file.connection.username.clone(),
-        rbmq_conf_from_file.connection.password.clone(),
-        rabbitclient::RabbitMQConfig::new(rbmq_conf_from_file)
-    ).await;
-    let s = app::Server::new(&server_address, Box::new(rbmqc)).await;
-
-    let _ = s.start().await;
+    let _ = app.start().await;
 }

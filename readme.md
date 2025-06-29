@@ -66,3 +66,12 @@ Some identifiers from `oxc` Abstract Syntax Tree:
 #### todo
 - rename `file_analysis_report.has_been_analysed`
 - use only `file_analysis_report` and not `file_analysis` or `file_report` in FileAnalysisReport variables
+
+#### Usage example
+```
+curl --location 'http://127.0.0.1:11234/analyse-file' \
+--form 'file_for_analysis=@"/home/dimeko/dev/mal-js-detection/js-samples/file2.js"' \
+--form 'bait_websites="https://facebook.com,https://google.com,https://cnn.com"' \
+--form 'static_analysis="true"' \
+--form 'dynamic_analysis="true"'
+```
