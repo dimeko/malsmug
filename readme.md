@@ -12,6 +12,7 @@ rustup override set nightly --path .
 ```
 Build RabbitMQ and Sandbox/Consumer images:
 ```bash
+cp .env.example .env
 docker compose build
 ```
 
@@ -39,7 +40,9 @@ To run the full application follow the below steps with the given order:
     ```
 2. Start the main application:
     ```bash
-    cp .env.example .env
+    cargo sqlx database create
+    cargo sqlx migrate run
+    cargo sqlx prepare
     cargo run -- --bindhost 127.0.0.1 --bindport 11234 -v -d
     ```
 3. Spin up the consumer / sandbox container

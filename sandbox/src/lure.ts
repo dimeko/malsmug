@@ -23,7 +23,6 @@ class Lure {
                 _form.submit()
             })
         }
-        console.log("[analysis-debug] forms lure finished")
     }
 
     public async start_lure() {

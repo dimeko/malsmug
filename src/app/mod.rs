@@ -326,7 +326,7 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
                                 },
                                 Err(e) => {
                                     error!(
-                                        "could not update analysed file db record: {:?}. Error: {:?}",
+                                        "[static-analysis] could not update analysed file db record: {:?}. Error: {:?}",
                                         file_report_uid, e);
                                 }
                             }
@@ -505,7 +505,7 @@ impl AppMethods for App {
                                                             },
                                                             Err(e) => {
                                                                 error!(
-                                                                    "could not update analysed file db record: {:?}. Error: {:?}",
+                                                                    "[dynamic-analysis] could not update analysed file db record: {:?}. Error: {:?}",
                                                                     file_report_uid, e);
                                                             }
                                                         }

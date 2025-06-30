@@ -147,7 +147,7 @@ impl FileAnalysisReportStoreTrait for FileAnalysisReportStore {
                 updated_file_analysis_report.last_analysis_id,
                 uid
             )
-            .fetch_one(&self.pool)
+            .execute(&self.pool)
             .await;
         return match result {
             Ok(_) => {
