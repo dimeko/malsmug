@@ -51,18 +51,13 @@ pub struct DeleteFileReport {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum Responses {
-    #[serde(rename = "body")]
     GenericErrorResponse(GenericErrorResponse),
-    #[serde(rename = "body")]
     GenericSuccessResponse(GenericSuccessResponse),
-    #[serde(rename = "body")]
     FileUploadResponse(FileUploadResponse),
-    #[serde(rename = "body")]
     GetFileReport(GetFileReport),
-    #[serde(rename = "body")]
     GetFileReports(GetFileReports),
-    #[serde(rename = "body")]
     DeleteFileReport(DeleteFileReport)
 }
 
