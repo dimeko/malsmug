@@ -69,11 +69,9 @@ Finally everything is running. Now you can submit files to the application api a
     ```json
       {
         "r": {
-            "body": {
-                "msg": "file was submitted",
-                "file_hash": "879a49c8feeb647fd906e5bb6bb1375352f5677c5cd2546a57093edaa7bce8b9",
-                "file_analysis_report_uid": "1ecee8d4-cab7-4a50-8767-6ca21c0e2557"
-            }
+          "msg": "file was submitted",
+          "file_hash": "879a49c8feeb647fd906e5bb6bb1375352f5677c5cd2546a57093edaa7bce8b9",
+          "file_analysis_report_uid": "1ecee8d4-cab7-4a50-8767-6ca21c0e2557"
         }
       }
     ```
@@ -88,50 +86,48 @@ Finally everything is running. Now you can submit files to the application api a
     ```json
     {
       "r": {
-          "body": {
-              "file_reports": [
-                  {
-                      "uid": "56827f93-41f4-4003-b519-7275a5e00251",
-                      "name": "suspocious_file.js",
-                      "file_hash": "879a49c8feeb647fd906e5bb6bb1375352f5677c5cd2546a57093edaa7bce8b9",
-                      "file_name": "suspocious_file.js",
-                      "file_extension": "js",
-                      "last_analysis_id": "17961f76-d721-4ceb-b38e-bcbbc8ee6783",
-                      "has_been_analysed": true,
-                      "dynamic_analysis": true,
-                      "static_analysis": true,
-                      "severity": 8,
-                      "bait_websites": [
-                          "https://facebook.com",
-                          "https://google.com",
-                          "https://cnn.com"
-                      ],
-                      "findings": [
-                          {
-                            "type": "Dynamic",
-                            "executed_on": "https://google.com",
-                            "severity": "High",
-                            "poc": "//bad.websites.com/js?i=&ran=bad-bad-bad",
-                            "title": "bad reputation url called"
-                          },
-                          {
-                              "type": "Static",
-                              "executed_on": "",
-                              "severity": "Moderate",
-                              "poc": "<script src =url></script>",
-                              "title": "html element adhoc write to dom"
-                          },
-                          {
-                              "type": "Static",
-                              "executed_on": "",
-                              "severity": "High",
-                              "poc": "execScript",
-                              "title": "execution of known suspicious commands"
-                          },
-                        ]
-                  }
-              ]
-          }
+        "file_reports": [
+            {
+                "uid": "56827f93-41f4-4003-b519-7275a5e00251",
+                "name": "suspocious_file.js",
+                "file_hash": "879a49c8feeb647fd906e5bb6bb1375352f5677c5cd2546a57093edaa7bce8b9",
+                "file_name": "suspocious_file.js",
+                "file_extension": "js",
+                "last_analysis_id": "17961f76-d721-4ceb-b38e-bcbbc8ee6783",
+                "has_been_analysed": true,
+                "dynamic_analysis": true,
+                "static_analysis": true,
+                "severity": 8,
+                "bait_websites": [
+                    "https://facebook.com",
+                    "https://google.com",
+                    "https://cnn.com"
+                ],
+                "findings": [
+                    {
+                      "type": "Dynamic",
+                      "executed_on": "https://google.com",
+                      "severity": "High",
+                      "poc": "//bad.websites.com/js?i=&ran=bad-bad-bad",
+                      "title": "bad reputation url called"
+                    },
+                    {
+                        "type": "Static",
+                        "executed_on": "",
+                        "severity": "Moderate",
+                        "poc": "<script src =url></script>",
+                        "title": "html element adhoc write to dom"
+                    },
+                    {
+                        "type": "Static",
+                        "executed_on": "",
+                        "severity": "High",
+                        "poc": "execScript",
+                        "title": "execution of known suspicious commands"
+                    },
+                  ]
+            }
+          ]
         }
     }
   ```
@@ -145,9 +141,7 @@ Finally everything is running. Now you can submit files to the application api a
   ```json
     {
       "r": {
-          "body": {
-              "file_reports_deleted": 1
-          }
+        "file_reports_deleted": 1
       }
     }
   ```
@@ -161,9 +155,7 @@ Finally everything is running. Now you can submit files to the application api a
   ```json
     {
       "r": {
-          "body": {
-              "file_reports_deleted": 17
-          }
+        "file_reports_deleted": 17
       }
     }
   ```
