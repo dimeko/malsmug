@@ -50,6 +50,7 @@ pub struct DB {
     pub file_analysis_report: Box<dyn FileAnalysisReportStoreTrait>
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Store {
     pub driver: String,

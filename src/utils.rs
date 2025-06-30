@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, fs, io::Read, path::{Path, PathBuf}};
 // use yaml_rust2::{YamlLoader, YamlEmitter};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize};
 use regex::Regex;
 use serde_yaml::Error;
 

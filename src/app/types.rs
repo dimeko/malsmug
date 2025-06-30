@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-
 use crate::{analysis::dast_ioc_types::{self}, store::models::FileAnalysisReport};
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]

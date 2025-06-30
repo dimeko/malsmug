@@ -70,6 +70,7 @@ impl RabbitMQConfig {
 }
 
 // #[derive(Clone)]
+#[allow(dead_code)]
 pub struct RabbitMQ {
     conn: Connection,
     channel: Channel,
