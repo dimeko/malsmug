@@ -104,6 +104,24 @@ function place_hooks(reportFnName: string) {
             return originalFetch.apply(this, args);
         };
 
+        const originalWindowOpen = window.open;
+        window.open = function (...args) {
+            let _event: types.IoC = {
+                type: types.IoCType.HttpRequest,
+                timestamp: Date.now(),
+                executed_on: "",
+                value: {
+                    url: args[0],
+                    method: "GET",
+                    data: ""
+                } as types.IoCHttpRequest
+            };
+            (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+
+            return originalWindowOpen.apply(this, args);
+        };
+
+
         const originalXHROpen = window.XMLHttpRequest.prototype.open;
         window.XMLHttpRequest.prototype.open = function(...args: any) {
             let _event: types.IoC = {

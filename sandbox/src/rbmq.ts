@@ -1,6 +1,6 @@
 import amqplib, { GetMessage } from 'amqplib';
 import * as types from "./types";
-
+import {default_rabbitmq_conf} from "./const"
 class RBMQ {
     // --------------------------------------------------------
     // host and port not used at the currently
@@ -20,6 +20,11 @@ class RBMQ {
         this.password = config.connection.password
         this.conn = null
         this.channel = null
+    }
+
+    static async empty(): Promise<RBMQ> {
+        const client = new RBMQ(default_rabbitmq_conf);
+        return client;
     }
 
     static async create(config: types.RabbitMQConfig): Promise<RBMQ> {

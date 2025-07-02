@@ -74,7 +74,13 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
                             byte_string = byte_string + chr(b)
                         f.write(byte_string)
                     subprocess.Popen(
-                        ["node", sandbox_lib, samples_file_path, bw, config_folder, file_for_analysis.analysis_id],
+                        [
+                            "node", sandbox_lib,
+                            "--sample-file", samples_file_path,
+                            "--bait-website", bw,
+                            "--conf-folder", config_folder,
+                            "--analysis-id", file_for_analysis.analysis_id
+                        ],
                         stdin=None, stdout=None, stderr=None)
         except Exception as e:
             logger.error("error processing message: ", e)
