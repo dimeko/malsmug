@@ -12,6 +12,7 @@ import { validate_logging_level } from "./utils";
 import { default_rabbitmq_conf } from "./const"
 import commandLineArgs from 'command-line-args'
 
+const MAX_SET_TIMEOUT_DELAY_TO_WAIT = 5000;
 // const args = process.argv;
 const cli_arg_options = [
     { name: 'dev', alias: 'd', type: Boolean, defaultValue: false },
@@ -97,14 +98,13 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         }
         request.continue();
     });
-    page.on('response', async response => {
-        // Continue all requests
-        logger.debug("response: ", response.headers())
-        if (response.request() && response.status() < 300 && response.status() >= 400) {
-            var buffer = await response.buffer(); /*You can get the buffer*/
-            var content = await response.text(); /*You can get the content as text*/
-        }
-    });
+    // page.on('response', async response => {
+    //     // Continue all requests
+    //     if (response.request() && response.status() < 300 && response.status() >= 400) {
+    //         var buffer = await response.buffer(); /*You can get the buffer*/
+    //         var content = await response.text(); /*You can get the content as text*/
+    //     }
+    // });
     browser.on('targetcreated', async target => {
         logger.warn("new page loaded: ", target)
     })
@@ -119,6 +119,7 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         logger.debug(`[dom-console]: ${message.text()}`);
     })
 
+    let max_delay = 0;
 
     // a random string suffix is created every time the analyser runs to make
     // sure Javascript cannot find and call our hook and mess with the analyser
@@ -130,6 +131,15 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     // we can perform any kind of normalization to the event
     await page.exposeFunction(reportIocFunctionName, (ioc: types.IoC) => {
         logger.debug('[analysis-debug] adding ioc: ', ioc);
+        if (ioc.type == types.IoCType.SetTimeout) {
+            let setTimeoutDelay = (ioc.value as types.IoCSetTimeout).delay
+            logger.debug(
+                '[analysis-debug] setTimeout was set with delay: ',
+                setTimeoutDelay)
+                if (max_delay < setTimeoutDelay && setTimeoutDelay <= MAX_SET_TIMEOUT_DELAY_TO_WAIT) {
+                    max_delay = setTimeoutDelay
+                }
+        }
         ioc.executed_on = baitWebsite
         iocs.push(
             ioc
@@ -166,6 +176,10 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         await lure.start_lure()
 
         logger.debug(`[analysis-debug] Finishing Lure`);
+        logger.info(`[analysis-info] Waiting for ${max_delay} before closing page`);
+        await new Promise(resolve =>
+            setTimeout(resolve, max_delay + 1000)
+        );
         await page.close();
 
         if (!cli_args.dev) {

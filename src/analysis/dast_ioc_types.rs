@@ -55,9 +55,10 @@ pub struct IoCFunctionCall {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct IoCNewHtmlElement {
+pub struct IoCNewNetworkHtmlElement {
     #[serde(rename = "elementType")]
-    pub element_type: String
+    pub element_type: String,
+    pub src: String
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -81,11 +82,12 @@ pub enum IoCValue {
     IoCHttpRequest(IoCHttpRequest),
     IoCHttpResponse(IoCHttpResponse),
     IoCFunctionCall(IoCFunctionCall),
-    IoCNewHtmlElement(IoCNewHtmlElement),
+    IoCNewNetworkHtmlElement(IoCNewNetworkHtmlElement),
     IoCSetCookie(IoCSetCookie),
     IoCGetCookie(IoCGetCookie),
     IoCConsoleLog(IoCConsoleLog),
-    IoCAddEventListener(IoCAddEventListener)
+    IoCAddEventListener(IoCAddEventListener),
+    None
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

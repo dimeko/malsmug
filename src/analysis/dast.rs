@@ -13,7 +13,7 @@ use crate::store::models::FileAnalysisReport;
 use crate::utils;
 use crate::analysis::analyzer;
 use crate::analysis::dast_ioc_types;
-
+use dast_ioc_types::IoCValue;
 const KNOWN_SENSITIVE_DATA_KEYS: [&str; 5] = [
     "ASPSESSIONID",
     "PHPSESSID",
@@ -83,6 +83,10 @@ impl DastAnalyzer {
             url_normalized = format!("https:{}", url);
         }
         return url_normalized;
+    }
+
+    fn _is_bad_domain_reputation(self, s: f32) -> bool {
+        return s <= 20.0 && s > 0.0
     }
 
     // fetches given domain reputation score from spamhaus.com
@@ -204,19 +208,19 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
         // on the host
         let mut findings: Vec<Finding> = Vec::new();
         
-        for event in iocs {
+        for ioc in iocs {
             // let inner_self = &mut self.clone();
-            match event.clone().value {
-                dast_ioc_types::IoCValue::IoCHttpRequest(_v) => {
+            match ioc.clone().value {
+                IoCValue::IoCHttpRequest(_v) => {
                     // analysis: check response url domain reputation
-                    let _score = self._get_domain_reputation(_v.url.as_str()).await;
-                    if _score <= 20.0 && _score > 0.0 {
+                    if self.clone()._is_bad_domain_reputation(self._get_domain_reputation(_v.url.as_str()).await) {
                         findings.push(
                                 analyzer::Finding {
                                     r#type: analyzer::AnalysisType::Dynamic,
-                                    executed_on: event.executed_on.clone(),
+                                    ioc: IoCValue::IoCHttpRequest(_v.clone()),
+                                    executed_on: ioc.executed_on.clone(),
                                     severity: analyzer::Severity::High,
-                                    poc: _v.url,
+                                    poc: _v.clone().url,
                                     title: "bad reputation url called".to_string()
                                 });
                     }
@@ -227,21 +231,22 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         findings.push(
                             analyzer::Finding {
                                 r#type: analyzer::AnalysisType::Dynamic,
-                                executed_on: event.executed_on.clone(), 
+                                ioc: IoCValue::IoCHttpRequest(_v.clone()),
+                                executed_on: ioc.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.data,
                                 title: "http request sent containing user input data".to_string()
                             });
                     }
                 },
-                dast_ioc_types::IoCValue::IoCHttpResponse(_v) => {
+                IoCValue::IoCHttpResponse(_v) => {
                     // analysis: check response url domain reputation
-                    let _score = self._get_domain_reputation(_v.url.as_str()).await;
-                    if _score <= 20.0 && _score > 0.0 {
+                    if self.clone()._is_bad_domain_reputation(self._get_domain_reputation(_v.url.as_str()).await) {
                         findings.push(
                             analyzer::Finding {
                                 r#type: analyzer::AnalysisType::Dynamic,
-                                executed_on: event.executed_on.clone(), 
+                                ioc: IoCValue::IoCHttpResponse(_v.clone()),
+                                executed_on: ioc.executed_on.clone(), 
                                 severity: analyzer::Severity::High,
                                 poc: _v.url,
                                 title: "bad reputation url called".to_string()
@@ -249,27 +254,31 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     }
 
                 },
-                dast_ioc_types::IoCValue::IoCNewHtmlElement(_v) => {
+                IoCValue::IoCNewNetworkHtmlElement(_v) => {
                     // analysis: check if the target creates new html elements that can potentially access the internet
-                    if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
+                    // if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
+                    if self.clone()._is_bad_domain_reputation(self._get_domain_reputation(&_v.src.as_str()).await) {
                         findings.push(
                             analyzer::Finding {
                                 r#type: analyzer::AnalysisType::Dynamic,
-                                executed_on: event.executed_on.clone(), 
+                                ioc: IoCValue::IoCNewNetworkHtmlElement(_v.clone()),
+                                executed_on: ioc.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.element_type,
-                                title: "dangerous html element created".to_string()
+                                title: "dangerous html element was created with low reputation src".to_string()
                             });
                     }
+                    // }
                 },
-                dast_ioc_types::IoCValue::IoCFunctionCall(_v) => {
+                IoCValue::IoCFunctionCall(_v) => {
                     // analysis: check document.write call with the first argument being an html-like element
                     if matches!(_v.callee.as_str(), "document.write") && _v.arguments.len() > 0 {
                         if utils::contains_html_like_code(_v.arguments[0].as_str()) {
                             findings.push(
                                 analyzer::Finding {
                                     r#type: analyzer::AnalysisType::Dynamic,
-                                    executed_on: event.executed_on.clone(), 
+                                    ioc: IoCValue::IoCFunctionCall(_v.clone()),
+                                    executed_on: ioc.executed_on.clone(), 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: _v.callee,
                                     title: "document.write was called with html element as parameter".to_string()
@@ -282,7 +291,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         findings.push(
                                 analyzer::Finding {
                                     r#type: analyzer::AnalysisType::Dynamic,
-                                    executed_on: event.executed_on.clone(), 
+                                    ioc: IoCValue::IoCFunctionCall(_v.clone()),
+                                    executed_on: ioc.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
                                 title: "window.eval was called".to_string()
@@ -292,7 +302,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         findings.push(
                             analyzer::Finding {
                                 r#type: analyzer::AnalysisType::Dynamic,
-                                executed_on: event.executed_on.clone(), 
+                                ioc: IoCValue::IoCFunctionCall(_v.clone()),
+                                executed_on: ioc.executed_on.clone(), 
                                 severity: analyzer::Severity::VeryHigh,
                                 poc: _v.callee,
                                 title: "window.execScript was called".to_string()
@@ -303,7 +314,8 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                             findings.push(
                                 analyzer::Finding {
                                     r#type: analyzer::AnalysisType::Dynamic,
-                                    executed_on: event.executed_on.clone(), 
+                                    ioc: IoCValue::IoCFunctionCall(_v.clone()),
+                                    executed_on: ioc.executed_on.clone(), 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: format!("{}({})", _v.callee, &_v.arguments[0].as_str()),
                                     title: "window.localStorage tried to access sensitive information".to_string()
@@ -311,23 +323,24 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                         }
                     }
                 },
-                dast_ioc_types::IoCValue::IoCGetCookie(_v) => {
+                IoCValue::IoCGetCookie(_v) => {
                     if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.cookie.as_str()) {
                             findings.push(
                                 analyzer::Finding {
                                     r#type: analyzer::AnalysisType::Dynamic,
-                                    executed_on: event.executed_on.clone(), 
+                                    ioc: IoCValue::IoCGetCookie(_v),
+                                    executed_on: ioc.executed_on.clone(), 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: "document.cookie".to_string(),
                                     title: "document.cookie tried to access sensitive data key".to_string()
                                 });
                     }
                 },
-                dast_ioc_types::IoCValue::IoCAddEventListener(_v) => {
+                IoCValue::IoCAddEventListener(_v) => {
                     debug!("added event_listener: {}", _v.listener);
                 }
                 _ => {
-                    warn!("event of type {} was not handled", event.ioc_type)
+                    warn!("event of type {} was not handled", ioc.ioc_type)
                 }
             }
         }

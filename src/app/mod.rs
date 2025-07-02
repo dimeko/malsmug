@@ -293,7 +293,7 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
                 match static_analyser.analyze(r.to_owned(), total_file_bytes) {
                     Ok(mut f) => {
                         info!("found {} findings for {:?}", f.len(), r.clone().file_name);
-                        // r.has_been_analysed = true; TODO: set a separate column to check if is analysed dynamically has_been_analysed_dynamically
+                        // r.has_started_analysis = true; TODO: set a separate column to check if is analysed dynamically has_started_analysis_dynamically
                         let mut tmp_findings: Vec<Finding> = Vec::new();
 
                         let mut max_severity = Severity::Low;
@@ -466,10 +466,10 @@ impl AppMethods for App {
                                         // If they are different we must initialize them from the start as it mean we are
                                         // on a different analysis session. 
                                         let mut append_to_findings = false;
-                                        if file_report.has_been_analysed {
+                                        if file_report.has_started_analysis {
                                             append_to_findings = true;
                                         }
-                                        file_report.has_been_analysed = true; // have to rename has_been_analysed
+                                        file_report.has_started_analysis = true; // have to rename has_started_analysis
                                         if file_report.dynamic_analysis {
                                             match dynamic_analyser.analyze(file_report.clone(), events_for_analysis.iocs).await {
                                                 Ok(mut f) => {
