@@ -33,7 +33,7 @@ const enum IoCType {
     GetCookie = "get_cookie",
     ConsoleLog = "console_log",
     AddEventListener = "add_event_listener",
-    SetTimeout = "set_timeout",
+    SetTimeout = "set_timeout"
 }
 
 type IoCHttpRequest = {
@@ -54,7 +54,7 @@ type IoCConsoleLog = {
 
 type IoCSetTimeout = {
     delay: number,
-    arguments: any[]
+    arguments: string[]
 }
 
 type IoCFunctionCall = {

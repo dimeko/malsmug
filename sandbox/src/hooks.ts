@@ -227,7 +227,18 @@ function place_hooks(reportFnName: string) {
             delay?: number,
             ...args: any[]
         ): any {
-            console.log("Hooked setTimeout", delay);
+            let _event: types.IoC = {
+                type: types.IoCType.SetTimeout,
+                timestamp: Date.now(),
+                executed_on: "",
+                value: {
+                    delay: delay,
+                    arguments: args.map((e: any) => {
+                        return String(e)
+                    })
+                } as types.IoCSetTimeout
+            };
+            (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
             return originalSetTimeout(callback, delay, ...args);
         };
         (hookedSetTimeout as any).__promisify__ = (originalSetTimeout as any).__promisify__;
@@ -235,27 +246,29 @@ function place_hooks(reportFnName: string) {
         (globalThis.setTimeout as any) = hookedSetTimeout;
 
 
-        let originalSetInterval = setTimeout
-        const hookedSetInterval = function (
-            callback: TimerHandler,
-            delay?: number,
-            ...args: any[]
-        ): any {
-            let _event: types.IoC = {
-                type: types.IoCType.SetTimeout,
-                timestamp: Date.now(),
-                executed_on: "",
-                value: {
-                    delay: delay,
-                    arguments: args
-                } as types.IoCSetTimeout
-            };
-            (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
-            return originalSetInterval(callback, delay, ...args);
-        };
-        (hookedSetInterval as any).__promisify__ = (originalSetInterval as any).__promisify__;
+        // let originalSetInterval = setInterval
+        // const hookedSetInterval = function (
+        //     callback: TimerHandler,
+        //     delay?: number,
+        //     ...args: any[]
+        // ): any {
+        //     let _event: types.IoC = {
+        //         type: types.IoCType.SetInterval,
+        //         timestamp: Date.now(),
+        //         executed_on: "",
+        //         value: {
+        //             delay: delay,
+        //             arguments: args.map((e: any) => {
+        //                 return String(e)
+        //             })
+        //         } as types.IoCSetInterval
+        //     };
+        //     (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+        //     return originalSetInterval(callback, delay, ...args);
+        // };
+        // (hookedSetInterval as any).__promisify__ = (originalSetInterval as any).__promisify__;
 
-        (globalThis.setTimeout as any) = hookedSetInterval;
+        // (globalThis.setInterval as any) = hookedSetInterval;
 
         const documentObserver = new MutationObserver((mutationList) => {
             for (const mutation of mutationList) {

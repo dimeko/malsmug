@@ -13,6 +13,9 @@ import { default_rabbitmq_conf } from "./const"
 import commandLineArgs from 'command-line-args'
 
 const MAX_SET_TIMEOUT_DELAY_TO_WAIT = 5000;
+const log_level = process.env.LOG_LEVEL;
+let logger = log.getLogger();
+logger.level = validate_logging_level(log_level ? log_level : 'info')
 // const args = process.argv;
 const cli_arg_options = [
     { name: 'dev', alias: 'd', type: Boolean, defaultValue: false },
@@ -25,18 +28,14 @@ const cli_arg_options = [
 
 const cli_args = commandLineArgs(cli_arg_options)
 
+logger.debug("cli_args: ", cli_args)
 var sampleFile = cli_args["sample-file"]
 var justCheckPage = cli_args["just-check-page"]
 
 var baitWebsite = cli_args["bait-website"]
-var configFolder = cli_args["config-folder"]
+var configFolder = cli_args["conf-folder"]
 var analysisId = cli_args["analysis-id"]
 
-const log_level = process.env.LOG_LEVEL;
-let logger = log.getLogger();
-logger.level = validate_logging_level(log_level ? log_level : 'info')
-
-logger.debug("cli arguments: ", cli_args)
 if (!sampleFile && !justCheckPage) {
     logger.error("Error: No JavaScript file provided!");
     process.exit(1);
@@ -71,7 +70,7 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         if (cli_args.dev) {
             logger.warn("[analysis-warn] In development mode, skipping queue connection ...");
         } else {
-            logger.error("[analysis-error] Could not connect to queue ...");
+            logger.error(`[analysis-error] Could not connect to queue: ${err}`);
             process.exit(1)
         }
     }
@@ -130,7 +129,6 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     // here we actually push iocs to the their final destination, the sandbox_ioc_queue
     // we can perform any kind of normalization to the event
     await page.exposeFunction(reportIocFunctionName, (ioc: types.IoC) => {
-        logger.debug('[analysis-debug] adding ioc: ', ioc);
         if (ioc.type == types.IoCType.SetTimeout) {
             let setTimeoutDelay = (ioc.value as types.IoCSetTimeout).delay
             logger.debug(
@@ -139,11 +137,13 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
                 if (max_delay < setTimeoutDelay && setTimeoutDelay <= MAX_SET_TIMEOUT_DELAY_TO_WAIT) {
                     max_delay = setTimeoutDelay
                 }
+        } else {
+            logger.debug('[analysis-debug] adding ioc: ', ioc);
+            ioc.executed_on = baitWebsite
+            iocs.push(
+                ioc
+            );
         }
-        ioc.executed_on = baitWebsite
-        iocs.push(
-            ioc
-        );
     });
     const place_hooks_source_code = place_hooks.toString();
 
