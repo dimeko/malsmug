@@ -1,5 +1,6 @@
 /target
 /sandbox/node_modules
+/sandbox/lib
 /test_docker/
 /whatever/
 findings.md
@@ -10,3 +11,4 @@ notes.txt
 **venv
 js-samples
 .env
+.no_git

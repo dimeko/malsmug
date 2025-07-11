@@ -2,7 +2,7 @@ use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{analysis::dast_ioc_types, store::models::FileAnalysisReport};
+use crate::{analysis::dast_ioc_types::{self, IoC, IoCValue}, store::models::FileAnalysisReport};
 
 #[allow(dead_code)]
 #[repr(i64)]
@@ -48,6 +48,7 @@ pub struct Finding {
     pub executed_on: String,
     pub severity: Severity,
     pub poc: String,
+    pub ioc: IoCValue,
     pub title: String,
 }
 

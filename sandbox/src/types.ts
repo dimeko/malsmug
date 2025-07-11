@@ -28,11 +28,12 @@ const enum IoCType {
     HttpRequest = "http_request",
     HttpResposne = "http_response",
     FunctionCall = "function_call",
-    NewHtmlElement = "new_html_element",
+    NewNetworkHtmlElement = "new_network_html_element",
     SetCookie = "set_cookie",
     GetCookie = "get_cookie",
     ConsoleLog = "console_log",
-    AddEventListener = "add_event_listener"
+    AddEventListener = "add_event_listener",
+    SetTimeout = "set_timeout"
 }
 
 type IoCHttpRequest = {
@@ -51,13 +52,19 @@ type IoCConsoleLog = {
     text: string
 }
 
+type IoCSetTimeout = {
+    delay: number,
+    arguments: string[]
+}
+
 type IoCFunctionCall = {
     callee: string,
     arguments: string[]
 }
 
-type IoCNewHtmlElement = {
-    elementType: string
+type IoCNewNetworkHtmlElement = {
+    elementType: string,
+    src: string
 }
 
 type IoCSetCookie = {
@@ -78,11 +85,12 @@ type IoC = {
     timestamp: number,
     value: IoCHttpRequest | 
         IoCFunctionCall | 
-        IoCNewHtmlElement | 
+        IoCNewNetworkHtmlElement | 
         IoCSetCookie | 
         IoCGetCookie | 
         IoCHttpResponse | 
         IoCConsoleLog | 
+        IoCSetTimeout |
         IoCAddEventListener,
 }
 
@@ -97,12 +105,13 @@ export {
     IoCType,
     IoCHttpRequest, 
     IoCFunctionCall, 
-    IoCNewHtmlElement, 
+    IoCNewNetworkHtmlElement, 
     IoCSetCookie, 
     IoCGetCookie, 
     IoCHttpResponse, 
     IoCConsoleLog, 
     IoCAddEventListener,
+    IoCSetTimeout,
     IoCsFromAnalysis,
     RabbitMQConfig,
     RabbitMQQueue,

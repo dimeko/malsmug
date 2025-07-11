@@ -25,7 +25,7 @@ pub mod types;
 use crate::{
     analysis::{
         analyzer::{self, DastAnalyze, Finding, SastAnalyze, Severity},dast::DastAnalyzer, sast::{self}},
-    app::types::EventsFromAnalysis,
+    app::types::{EventsFromAnalysis, Response},
     store::{self, models::FileAnalysisReport, StoreError},
     utils
 };
@@ -58,6 +58,31 @@ impl App {
     }
 }
 
+fn error_response(e: StoreError) -> (StatusCode, axum::Json<Response>) {
+    match &e {
+        StoreError::NotFoundError => {
+            (StatusCode::NOT_FOUND, Json(
+                types::Response{
+                        r:  types::Responses::GenericErrorResponse(
+                                types::GenericErrorResponse { msg: format!("Entry not found") }
+                            )
+                        }
+                    )
+                )
+        },
+        _ => {
+            (StatusCode::BAD_REQUEST, Json(
+                types::Response{
+                        r:  types::Responses::GenericErrorResponse(
+                                types::GenericErrorResponse { msg: format!("Error: {:?}", e.to_string()) }
+                            )
+                        }
+                    )
+                )
+        }
+    }
+}
+
 async fn delete_file_reports_by_hash(Extension(ctx): Extension<ApiContext>, Path(file_hash): Path<String>) -> impl IntoResponse {
     let r = match ctx.store.db.file_analysis_report.delete_file_reports_by_hash(&file_hash).await {
         Ok(r) => {
@@ -72,30 +97,7 @@ async fn delete_file_reports_by_hash(Extension(ctx): Extension<ApiContext>, Path
                         )
                     )
         },
-        Err(e) => {
-            match &e {
-                StoreError::NotFoundError => {
-                    (StatusCode::NOT_FOUND, Json(
-                        types::Response{
-                                r:  types::Responses::GenericErrorResponse(
-                                        types::GenericErrorResponse { msg: format!("Entry not found") }
-                                    )
-                                }
-                            )
-                        )
-                },
-                _ => {
-                    (StatusCode::BAD_REQUEST, Json(
-                        types::Response{
-                                r:  types::Responses::GenericErrorResponse(
-                                        types::GenericErrorResponse { msg: format!("Error deleting file reports. Error: {:?}", e.to_string()) }
-                                    )
-                                }
-                            )
-                        )
-                }
-            }
-        }
+        Err(e) => error_response(e)
     };
     r
 }
@@ -115,30 +117,7 @@ async fn delete_file_report(Extension(ctx): Extension<ApiContext>, Path(file_rep
                         )
                     )
         },
-        Err(e) => {
-            match &e {
-                StoreError::NotFoundError => {
-                    (StatusCode::NOT_FOUND, Json(
-                        types::Response{
-                                r:  types::Responses::GenericErrorResponse(
-                                        types::GenericErrorResponse { msg: format!("Entries not found") }
-                                    )
-                                }
-                            )
-                        )
-                },
-                _ => {
-                    (StatusCode::BAD_REQUEST, Json(
-                        types::Response{
-                                r:  types::Responses::GenericErrorResponse(
-                                        types::GenericErrorResponse { msg: format!("Error deleting file reports. Error: {:?}", e.to_string()) }
-                                    )
-                                }
-                            )
-                        )
-                }
-            }
-        }
+        Err(e) => error_response(e)
     };
     r
 }
@@ -158,30 +137,7 @@ async fn get_file_reports(Extension(ctx): Extension<ApiContext>, Path(file_hash)
                         )
                     )
             }
-            Err(e) => {
-                match &e {
-                    StoreError::NotFoundError => {
-                        (StatusCode::NOT_FOUND, Json(
-                            types::Response{
-                                    r:  types::Responses::GenericErrorResponse(
-                                            types::GenericErrorResponse { msg: format!("Entries not found") }
-                                        )
-                                    }
-                                )
-                            )
-                    },
-                    _ => {
-                        (StatusCode::BAD_REQUEST, Json(
-                            types::Response{
-                                    r:  types::Responses::GenericErrorResponse(
-                                            types::GenericErrorResponse { msg: format!("Error deleting file reports. Error: {:?}", e.to_string()) }
-                                        )
-                                    }
-                                )
-                            )
-                    }
-                }
-            }
+            Err(e) => error_response(e)
         };
     r
 }
@@ -193,6 +149,8 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
     let mut static_analysis = false;
     let mut dynamic_analysis = false;
     let mut total_file_bytes: Vec<u8> = Vec::new();
+    let mut page_for_analysis = String::new();
+
     while let Some(field) = match multipart.next_field().await {
         Ok(f) => f,
         Err(err) => {
@@ -209,6 +167,9 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
                 debug!("file name: {}", file_name);
                 file_name = field.file_name().unwrap().to_string();
                 total_file_bytes = field.bytes().await.unwrap().to_vec();
+            },
+            "page_for_analysis" => {
+                page_for_analysis = field.text().await.unwrap().to_string();
             },
             "bait_websites" => {
                 let tmp_bait_websites = field.text().await.unwrap().to_string();
@@ -228,6 +189,19 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
             },
             _ => {}
         }
+    }
+
+    // if user has given a whole page for analysis then we change the below values
+    if !page_for_analysis.is_empty() {
+        bait_websites = Vec::new();
+        bait_websites.push(page_for_analysis.clone());
+        let page_name_hash =  sha256::digest( page_for_analysis.clone().as_bytes()).to_string();
+        static_analysis = false;
+        let tmp_dummy_file_bytes = String::from(
+            format!("// dummy file for {} {}", page_for_analysis.clone(), page_name_hash)
+        );
+        total_file_bytes = tmp_dummy_file_bytes.as_bytes().to_vec();
+        file_name = String::from(format!("dummy_{}.js", page_name_hash));
     }
 
     // let's find the file extension. We need it specifically for othe Static analysis phase
@@ -293,7 +267,7 @@ async fn analyse_file(Extension(ctx): Extension<ApiContext>, mut multipart: Mult
                 match static_analyser.analyze(r.to_owned(), total_file_bytes) {
                     Ok(mut f) => {
                         info!("found {} findings for {:?}", f.len(), r.clone().file_name);
-                        // r.has_been_analysed = true; TODO: set a separate column to check if is analysed dynamically has_been_analysed_dynamically
+                        // r.has_started_analysis = true; TODO: set a separate column to check if is analysed dynamically has_started_analysis_dynamically
                         let mut tmp_findings: Vec<Finding> = Vec::new();
 
                         let mut max_severity = Severity::Low;
@@ -466,10 +440,10 @@ impl AppMethods for App {
                                         // If they are different we must initialize them from the start as it mean we are
                                         // on a different analysis session. 
                                         let mut append_to_findings = false;
-                                        if file_report.has_been_analysed {
+                                        if file_report.has_started_analysis {
                                             append_to_findings = true;
                                         }
-                                        file_report.has_been_analysed = true; // have to rename has_been_analysed
+                                        file_report.has_started_analysis = true; // have to rename has_started_analysis
                                         if file_report.dynamic_analysis {
                                             match dynamic_analyser.analyze(file_report.clone(), events_for_analysis.iocs).await {
                                                 Ok(mut f) => {

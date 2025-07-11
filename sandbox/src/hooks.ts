@@ -1,6 +1,19 @@
 import * as types from "./types";
 
 function place_hooks(reportFnName: string) {
+    const KNOWN_NETWORK_DOM_ELEMENTS: {[key: string]:string} = {
+        "form": "action",
+        "img": "src",
+        "audio": "src",
+        "source": "src",
+        "video": "src",
+        "track": "src",
+        "script": "src",
+        "link": "href",
+        "iframe": "src",
+        "object": "src",
+        "embed": "src"
+    };
     try {
         const originalSetItem = window.localStorage.setItem;
         window.localStorage.setItem = function (key: string, value: string) {
@@ -104,6 +117,24 @@ function place_hooks(reportFnName: string) {
             return originalFetch.apply(this, args);
         };
 
+        const originalWindowOpen = window.open;
+        window.open = function (...args) {
+            let _event: types.IoC = {
+                type: types.IoCType.HttpRequest,
+                timestamp: Date.now(),
+                executed_on: "",
+                value: {
+                    url: args[0],
+                    method: "GET",
+                    data: ""
+                } as types.IoCHttpRequest
+            };
+            (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+
+            return originalWindowOpen.apply(this, args);
+        };
+
+
         const originalXHROpen = window.XMLHttpRequest.prototype.open;
         window.XMLHttpRequest.prototype.open = function(...args: any) {
             let _event: types.IoC = {
@@ -190,18 +221,74 @@ function place_hooks(reportFnName: string) {
             return originalAddEventListener.apply(this, [listener, fn] as [listener: string, fn: any]);
         };
 
+        let originalSetTimeout = setTimeout
+        const hookedSetTimeout = function (
+            callback: TimerHandler,
+            delay?: number,
+            ...args: any[]
+        ): any {
+            let _event: types.IoC = {
+                type: types.IoCType.SetTimeout,
+                timestamp: Date.now(),
+                executed_on: "",
+                value: {
+                    delay: delay,
+                    arguments: args.map((e: any) => {
+                        return String(e)
+                    })
+                } as types.IoCSetTimeout
+            };
+            (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+            return originalSetTimeout(callback, delay, ...args);
+        };
+        (hookedSetTimeout as any).__promisify__ = (originalSetTimeout as any).__promisify__;
+
+        (globalThis.setTimeout as any) = hookedSetTimeout;
+
+
+        // let originalSetInterval = setInterval
+        // const hookedSetInterval = function (
+        //     callback: TimerHandler,
+        //     delay?: number,
+        //     ...args: any[]
+        // ): any {
+        //     let _event: types.IoC = {
+        //         type: types.IoCType.SetInterval,
+        //         timestamp: Date.now(),
+        //         executed_on: "",
+        //         value: {
+        //             delay: delay,
+        //             arguments: args.map((e: any) => {
+        //                 return String(e)
+        //             })
+        //         } as types.IoCSetInterval
+        //     };
+        //     (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+        //     return originalSetInterval(callback, delay, ...args);
+        // };
+        // (hookedSetInterval as any).__promisify__ = (originalSetInterval as any).__promisify__;
+
+        // (globalThis.setInterval as any) = hookedSetInterval;
+
         const documentObserver = new MutationObserver((mutationList) => {
             for (const mutation of mutationList) {
-                mutation.addedNodes.forEach((node: Node) => {
-                    let _event: types.IoC = {
-                        type: types.IoCType.NewHtmlElement,
-                        timestamp: Date.now(),
-                        executed_on: "",
-                        value: {
-                            elementType: node.nodeName.toLowerCase()
-                        } as types.IoCNewHtmlElement
-                    };
-                    (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+                mutation.addedNodes.forEach((node: Node, key: number, parent: NodeList) => {
+                    if (node.ELEMENT_NODE == node.nodeType) {
+                        if(node.nodeName.toLowerCase() in KNOWN_NETWORK_DOM_ELEMENTS) {
+                            let _event: types.IoC = {
+                                type: types.IoCType.NewNetworkHtmlElement,
+                                timestamp: Date.now(),
+                                executed_on: "",
+                                value: {
+                                    elementType: node.nodeName.toLowerCase(),
+                                    src: (node as HTMLElement).getAttribute(KNOWN_NETWORK_DOM_ELEMENTS[node.nodeName.toLowerCase()])
+                                } as types.IoCNewNetworkHtmlElement
+                            };
+                            (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+                        }
+                    }
+
+
                 });
             }
         });

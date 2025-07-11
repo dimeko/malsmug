@@ -7,8 +7,10 @@ pub enum IoCType {
     HttpRequest,
     HttpResponse,
     FunctionCall,
-    NewHtmlElement,
+    NewNetworkHtmlElement,
     SetCookie,
+    // SetTimeout,
+    // SetInterval,
     GetCookie,
     ConsoleLog,
     AddEventListener
@@ -20,8 +22,10 @@ impl fmt::Display for IoCType {
             IoCType::HttpRequest => write!(f, "http_request"),
             IoCType::HttpResponse => write!(f, "http_response"),
             IoCType::FunctionCall => write!(f, "function_call"),
-            IoCType::NewHtmlElement => write!(f, "new_html_element"),
+            IoCType::NewNetworkHtmlElement => write!(f, "new_network_html_element"),
             IoCType::SetCookie => write!(f, "set_cookie"),
+            // IoCType::SetTimeout => write!(f, "set_timeout"),
+            // IoCType::SetInterval => write!(f, "set_interval"),
             IoCType::GetCookie => write!(f, "get_cookie"),
             IoCType::ConsoleLog => write!(f, "console_log"),
             IoCType::AddEventListener => write!(f, "add_event_listener"),
@@ -55,9 +59,10 @@ pub struct IoCFunctionCall {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct IoCNewHtmlElement {
+pub struct IoCNewNetworkHtmlElement {
     #[serde(rename = "elementType")]
-    pub element_type: String
+    pub element_type: String,
+    pub src: String
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -70,6 +75,18 @@ pub struct IoCGetCookie {
     pub cookie: String
 }
 
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct IoCSetTimeout {
+//     pub cookie: String,
+//     pub arguments: Vec<String>
+// }
+
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct IoCSetInterval {
+//     pub cookie: String,
+//     pub arguments: Vec<String>
+// }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IoCAddEventListener {
     pub listener: String
@@ -81,11 +98,14 @@ pub enum IoCValue {
     IoCHttpRequest(IoCHttpRequest),
     IoCHttpResponse(IoCHttpResponse),
     IoCFunctionCall(IoCFunctionCall),
-    IoCNewHtmlElement(IoCNewHtmlElement),
+    IoCNewNetworkHtmlElement(IoCNewNetworkHtmlElement),
     IoCSetCookie(IoCSetCookie),
     IoCGetCookie(IoCGetCookie),
     IoCConsoleLog(IoCConsoleLog),
-    IoCAddEventListener(IoCAddEventListener)
+    IoCAddEventListener(IoCAddEventListener),
+    // IoCSetTimeout(IoCSetTimeout),
+    // IoCSetInterval(IoCSetInterval),
+    None
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

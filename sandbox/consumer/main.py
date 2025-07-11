@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 import yaml
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +74,15 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
                         for b in file_for_analysis.file_bytes:
                             byte_string = byte_string + chr(b)
                         f.write(byte_string)
-                    subprocess.Popen(
-                        ["node", sandbox_lib, samples_file_path, bw, config_folder, file_for_analysis.analysis_id],
-                        stdin=None, stdout=None, stderr=None)
+                    analysis_command = [
+                            "node", sandbox_lib,
+                            "--sample-file", samples_file_path,
+                            "--bait-website", bw,
+                            "--conf-folder", config_folder,
+                            "--analysis-id", file_for_analysis.analysis_id
+                        ]
+                    logger.info("running analysis command: ", analysis_command)
+                    subprocess.Popen(analysis_command, stdin=None, stdout=None, stderr=None)
         except Exception as e:
             logger.error("error processing message: ", e)
         
@@ -132,6 +139,7 @@ def run(samples_dir="", sandbox_lib="", config_folder="", bait_website=""):
                 break
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout, level=validate_log_level(os.environ['LOG_LEVEL']))
     logger.setLevel(validate_log_level(os.environ['LOG_LEVEL']))
     parser = ArgumentParser(
                     prog='Sandbox',

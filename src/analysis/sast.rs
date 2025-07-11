@@ -89,6 +89,7 @@ struct Scanner {
     _interesting_items: Vec<StaticAnalysisIoC>
 }
 
+// check for navigator.webdriver
 impl<'a> Visit<'a> for Scanner {
     fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
         if let Expression::StaticMemberExpression(_c) = &it.callee { // rule for file1
@@ -171,6 +172,7 @@ impl<'a> analyzer::SastAnalyze<'a> for SastAnalyzer {
         let mut _interesting_findings: Vec<analyzer::Finding> = _interesting_findings_iter.iter().map(|_it| {
             return analyzer::Finding {
                 r#type: analyzer::AnalysisType::Static,
+                ioc: super::dast_ioc_types::IoCValue::None,
                 executed_on: "".to_string(),
                 poc: _it.poc.clone(),
                 severity: _it.severity.clone(),
