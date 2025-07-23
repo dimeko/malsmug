@@ -14,6 +14,7 @@ use crate::utils;
 use crate::analysis::analyzer;
 use crate::analysis::dast_ioc_types;
 use dast_ioc_types::IoCValue;
+
 const KNOWN_SENSITIVE_DATA_KEYS: [&str; 5] = [
     "ASPSESSIONID",
     "PHPSESSID",
@@ -23,20 +24,6 @@ const KNOWN_SENSITIVE_DATA_KEYS: [&str; 5] = [
 ];
 
 const DEFAULT_DOMAIN_REPUTATION: f32 = 15.0;
-
-const KNOWN_NETWORK_DOM_ELEMENTS: [&str; 11] = [
-    "form",
-    "img",
-    "audio",
-    "source",
-    "video",
-    "track",
-    "script",
-    "link",
-    "iframe",
-    "object",
-    "embed"
-];
 
 // DynamicAnalysisIoC is supposed to be used in multiple different scanners
 // Currently, in our simple implementation, we use analyzer::Finding without
@@ -252,11 +239,11 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                                 title: "bad reputation url called".to_string()
                             });
                     }
-
                 },
+                IoCValue::IoCSuspiciousFileDownload(_v) => {
+                    
+                }
                 IoCValue::IoCNewNetworkHtmlElement(_v) => {
-                    // analysis: check if the target creates new html elements that can potentially access the internet
-                    // if KNOWN_NETWORK_DOM_ELEMENTS.contains(&_v.element_type.as_str()) {
                     if self.clone()._is_bad_domain_reputation(self._get_domain_reputation(&_v.src.as_str()).await) {
                         findings.push(
                             analyzer::Finding {

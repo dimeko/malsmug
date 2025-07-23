@@ -9,7 +9,7 @@ import yaml from 'yaml';
 import { sha256 } from 'js-sha256';
 import * as log from "log4js";
 import { validate_logging_level } from "./utils";
-import { default_rabbitmq_conf } from "./const"
+import { default_rabbitmq_conf, malicious_mime_types } from "./const"
 import commandLineArgs from 'command-line-args'
 
 const MAX_SET_TIMEOUT_DELAY_TO_WAIT = 5000;
@@ -79,31 +79,34 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     logger.info("[analysis-info] Launched ...");
     const page = await browser.newPage();
     await page.setRequestInterception(true);
-      page.on('request', request => {
-        if(request.url().endsWith('.zip')) {
-            logger.debug('[analysis-debug] adding ioc: downloads zip file');
+    page.on('request', request => {
+
+        request.continue();
+    });
+    page.on('response', async response => {
+        const headers = response.headers();
+        if (malicious_mime_types.includes(headers["content-type"])) {
+            logger.debug('[analysis-debug] suspicious file download');
+            let file_extension = "";
+            try {
+                file_extension = headers["content-type"].split("/")[1]
+            } catch(err) {
+                logger.debug('[analysis-debug] could not get downloaded file extension');
+            }
             iocs.push(
                 {
-                    type: types.IoCType.HttpRequest,
+                    type: types.IoCType.SuspiciousFileDownload,
                     timestamp: Date.now(),
                     executed_on: baitWebsite,
                     value: {
-                        url: request.url(),
-                        method:"GET",
-                        data: ""
-                    } as types.IoCHttpRequest
+                        url: response.url(),
+                        extension: file_extension,
+                        data: await response.content()
+                    } as types.IoCSuspiciousFileDownload
                 }
             );
         }
-        request.continue();
     });
-    // page.on('response', async response => {
-    //     // Continue all requests
-    //     if (response.request() && response.status() < 300 && response.status() >= 400) {
-    //         var buffer = await response.buffer(); /*You can get the buffer*/
-    //         var content = await response.text(); /*You can get the content as text*/
-    //     }
-    // });
     browser.on('targetcreated', async target => {
         logger.warn("new page loaded: ", target)
     })

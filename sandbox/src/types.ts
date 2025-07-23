@@ -33,7 +33,8 @@ const enum IoCType {
     GetCookie = "get_cookie",
     ConsoleLog = "console_log",
     AddEventListener = "add_event_listener",
-    SetTimeout = "set_timeout"
+    SetTimeout = "set_timeout",
+    SuspiciousFileDownload = "suspicious_file_download"
 }
 
 type IoCHttpRequest = {
@@ -60,6 +61,12 @@ type IoCSetTimeout = {
 type IoCFunctionCall = {
     callee: string,
     arguments: string[]
+}
+
+type IoCSuspiciousFileDownload = {
+    url: string,
+    extension: string,
+    data: Uint8Array
 }
 
 type IoCNewNetworkHtmlElement = {
@@ -91,6 +98,7 @@ type IoC = {
         IoCHttpResponse | 
         IoCConsoleLog | 
         IoCSetTimeout |
+        IoCSuspiciousFileDownload |
         IoCAddEventListener,
 }
 
@@ -112,6 +120,7 @@ export {
     IoCConsoleLog, 
     IoCAddEventListener,
     IoCSetTimeout,
+    IoCSuspiciousFileDownload,
     IoCsFromAnalysis,
     RabbitMQConfig,
     RabbitMQQueue,

@@ -1,19 +1,7 @@
 import * as types from "./types";
+import { known_network_dom_elements } from "./const"
 
 function place_hooks(reportFnName: string) {
-    const KNOWN_NETWORK_DOM_ELEMENTS: {[key: string]:string} = {
-        "form": "action",
-        "img": "src",
-        "audio": "src",
-        "source": "src",
-        "video": "src",
-        "track": "src",
-        "script": "src",
-        "link": "href",
-        "iframe": "src",
-        "object": "src",
-        "embed": "src"
-    };
     try {
         const originalSetItem = window.localStorage.setItem;
         window.localStorage.setItem = function (key: string, value: string) {
@@ -274,14 +262,14 @@ function place_hooks(reportFnName: string) {
             for (const mutation of mutationList) {
                 mutation.addedNodes.forEach((node: Node, key: number, parent: NodeList) => {
                     if (node.ELEMENT_NODE == node.nodeType) {
-                        if(node.nodeName.toLowerCase() in KNOWN_NETWORK_DOM_ELEMENTS) {
+                        if(node.nodeName.toLowerCase() in known_network_dom_elements) {
                             let _event: types.IoC = {
                                 type: types.IoCType.NewNetworkHtmlElement,
                                 timestamp: Date.now(),
                                 executed_on: "",
                                 value: {
                                     elementType: node.nodeName.toLowerCase(),
-                                    src: (node as HTMLElement).getAttribute(KNOWN_NETWORK_DOM_ELEMENTS[node.nodeName.toLowerCase()])
+                                    src: (node as HTMLElement).getAttribute(known_network_dom_elements[node.nodeName.toLowerCase()])
                                 } as types.IoCNewNetworkHtmlElement
                             };
                             (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)

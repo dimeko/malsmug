@@ -13,7 +13,8 @@ pub enum IoCType {
     // SetInterval,
     GetCookie,
     ConsoleLog,
-    AddEventListener
+    AddEventListener,
+    SuspiciousFileDownload
 }
 
 impl fmt::Display for IoCType {
@@ -29,6 +30,7 @@ impl fmt::Display for IoCType {
             IoCType::GetCookie => write!(f, "get_cookie"),
             IoCType::ConsoleLog => write!(f, "console_log"),
             IoCType::AddEventListener => write!(f, "add_event_listener"),
+            IoCType::SuspiciousFileDownload => write!(f, "suspicious_file_download"),
         }
     }
 }
@@ -75,6 +77,13 @@ pub struct IoCGetCookie {
     pub cookie: String
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IoCSuspiciousFileDownload {
+    pub url: String,
+    pub extension: String,
+    pub data: Vec<u8>
+}
+
 // #[derive(Serialize, Deserialize, Debug, Clone)]
 // pub struct IoCSetTimeout {
 //     pub cookie: String,
@@ -103,6 +112,7 @@ pub enum IoCValue {
     IoCGetCookie(IoCGetCookie),
     IoCConsoleLog(IoCConsoleLog),
     IoCAddEventListener(IoCAddEventListener),
+    IoCSuspiciousFileDownload(IoCSuspiciousFileDownload),
     // IoCSetTimeout(IoCSetTimeout),
     // IoCSetInterval(IoCSetInterval),
     None
