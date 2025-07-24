@@ -52,7 +52,6 @@ const malicious_mime_types = [
     "application/xul+xml",
     "application/vnd.mozilla.xul+xml",
     "application/json",
-    "image/svg+xml"
 ];
 
 const default_rabbitmq_conf: types.RabbitMQConfig = {

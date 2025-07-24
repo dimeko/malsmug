@@ -76,6 +76,25 @@ Finally everything is running. Now you can submit files to the application api a
       }
     ```
 
+- Submit page for analysis
+    - `page_for_analysis`: a suspicious page that you want to analyse
+
+    ```bash
+    curl --location 'http://127.0.0.1:11234/analyse-file' \
+    --form 'page_for_analysis="https://malicious.com"'
+    ```
+
+    response:
+    ```json
+      {
+        "r": {
+          "msg": "file was submitted",
+          "file_hash": "879a49c8feeb647fd906e5bb6bb1375352f5677c5cd2546a57093edaa7bce8b9",
+          "file_analysis_report_uid": "1ecee8d4-cab7-4a50-8767-6ca21c0e2557"
+        }
+      }
+    ```
+
 - Retrieve analysis reports for a specific file hash:
 
     ```bash

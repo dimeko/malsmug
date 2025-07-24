@@ -2,7 +2,6 @@ use std::fs;
 use std::fs::create_dir_all;
 use std::io::Read;
 use std::fs::File;
-use std::path::Path;
 use std::path::PathBuf;
 use serde::Deserialize;
 use serde_json::Value;
@@ -260,14 +259,21 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                 },
                 IoCValue::IoCSuspiciousFileDownload(_v) => {
                     match utils::get_env_var("VIRUS_TOTAL_API_KEY") {
-                        Some(v) => {
+                        Some(vt_api_key) => {
+                            debug!("VT api key: {:?}", vt_api_key);
                             let file_sha256 = sha256::digest(&_v.clone().data).to_string();
                             let tmp_file_path = self.tmp_dir.join(PathBuf::from(&file_sha256));
                             match fs::write(&tmp_file_path, _v.clone().data) {
                                 Ok(_) => {
-                                    let vtclient: VTClient = VTClient::new(&v);
-                                    match vtclient.scan_file(tmp_file_path.as_os_str().to_str().unwrap(), &file_sha256) {
+                                    let inner_value = vt_api_key.clone();
+                                    let _res = tokio::task::spawn_blocking(move || {
+                                        let vtclient_inner: VTClient = VTClient::new(&inner_value);
+                                        vtclient_inner.submit_file(tmp_file_path.as_os_str().to_str().unwrap())
+                                    }).await;
+                                    let vtclient: VTClient = VTClient::new(&vt_api_key);
+                                    match vtclient.get_file_report(&file_sha256).await {
                                         Ok(r) => {
+                                            info!("file: {:?}, VT score: {:?}", file_sha256, r);
                                             if r > 6 {
                                                 findings.push(
                                                     analyzer::Finding {
@@ -277,9 +283,9 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                                                         severity: analyzer::Severity::High,
                                                         poc: _v.url,
                                                         title: "malicious file was downloaded".to_string()
-                                                    });
+                                                    }
+                                                );
                                             }
-                                           
                                         },
                                         Err(e) =>{
                                             error!("error analysing the file: {:?}", e);

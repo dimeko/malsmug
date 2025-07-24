@@ -66,7 +66,7 @@ type IoCFunctionCall = {
 type IoCSuspiciousFileDownload = {
     url: string,
     extension: string,
-    data: Uint8Array
+    data: number[]
 }
 
 type IoCNewNetworkHtmlElement = {

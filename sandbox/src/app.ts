@@ -80,9 +80,9 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     const page = await browser.newPage();
     await page.setRequestInterception(true);
     page.on('request', request => {
-
         request.continue();
     });
+
     page.on('response', async response => {
         const headers = response.headers();
         if (malicious_mime_types.includes(headers["content-type"])) {
@@ -93,18 +93,19 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
             } catch(err) {
                 logger.debug('[analysis-debug] could not get downloaded file extension');
             }
-            iocs.push(
-                {
-                    type: types.IoCType.SuspiciousFileDownload,
-                    timestamp: Date.now(),
-                    executed_on: baitWebsite,
-                    value: {
-                        url: response.url(),
-                        extension: file_extension,
-                        data: await response.content()
-                    } as types.IoCSuspiciousFileDownload
-                }
-            );
+            let byte_array = Array.from(await response.content())
+            let ioc = {
+                type: types.IoCType.SuspiciousFileDownload,
+                timestamp: Date.now(),
+                executed_on: baitWebsite,
+                value: {
+                    url: response.url(),
+                    extension: file_extension,
+                    data: byte_array
+                } as types.IoCSuspiciousFileDownload
+            }
+            logger.debug('[analysis-debug] adding ioc: ', ioc);
+            iocs.push(ioc);
         }
     });
     browser.on('targetcreated', async target => {
