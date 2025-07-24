@@ -1,18 +1,18 @@
 use std::{thread, time};
 
 use anyhow::Error;
-use log::{info, error};
+use log::{info, warn};
 use vt3::VtClient;
 
+const MAX_TRIES_ON_FILE_INFO: u8 = 5;
+
 pub struct VTClient {
-    api_key: String,
     vt_client: VtClient
 }
 
 impl VTClient {
     pub fn new(api_key: &str) -> VTClient {
         VTClient {
-            api_key: api_key.to_string(),
             vt_client: VtClient::new(&api_key)
         }
     }
@@ -20,6 +20,7 @@ impl VTClient {
     pub fn scan_file(&self, file: &str, file_hash: &str) -> Result<i64, Error> {
         match self.vt_client.file_scan(file) {
             Ok(r) => {
+                let mut tries = 0;
                 loop {
                     info!("Polling Virus Total for results");
                     thread::sleep(time::Duration::from_secs(3));
@@ -28,8 +29,13 @@ impl VTClient {
                             return Ok(r.data.unwrap().attributes.unwrap().last_analysis_stats.unwrap().malicious.unwrap())
                         },
                         Err(e) => {
-                            error!("error scanning file: {:?}", &file_hash);
-                            return Err(e.into());
+                            if tries >= MAX_TRIES_ON_FILE_INFO {
+                                warn!("error scanning file: {:?}", &file_hash);
+                                return Ok(-1);
+                            } else {
+                                warn!("file analysis not available yet: {:?}", &file_hash);
+                            }
+                            tries = tries + 1;
                         }
                     }
                 }
