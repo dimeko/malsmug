@@ -1,6 +1,6 @@
 
-use std::{sync::Arc, time::{self}};
-use async_std::stream::StreamExt;
+use std::{fs::create_dir_all, os, path::PathBuf, sync::Arc, time::{self}};
+use async_std::{stream::StreamExt};
 use lapin::options::BasicAckOptions;
 use tokio::task;
 use axum::{
@@ -18,6 +18,7 @@ use serde::{Serialize};
 use std::thread;
 use log::{debug, error, info, warn};
 use sha256;
+use home;
 
 pub mod rabbitclient;
 pub mod types;
@@ -44,16 +45,32 @@ pub trait AppMethods {
 pub struct App {
     bindhost: String,
     store: Store,
-    queue: Arc<dyn rabbitclient::RBMQ + Send + Sync>
+    queue: Arc<dyn rabbitclient::RBMQ + Send + Sync>,
+    malsmug_dir: PathBuf
 }
 
 impl App {
     pub async fn new(h: String, q: Box<dyn rabbitclient::RBMQ + Send + Sync>) -> Self {
+        let home_dir = match home::home_dir() {
+            Some(path) => {
+                path
+            },
+            _ => panic!("could not determine home dir"),
+        };
+
         let store = Store::new("sqlite").await;
+        let app_home_dir = home_dir.join(PathBuf::from("./malsmug"));
+        match create_dir_all(&app_home_dir) {
+            Ok(_) => (),
+            Err(_) => {
+                panic!("could not create home dir");
+            }
+        };
         Self {
             bindhost: h.clone(),
             store,
-            queue: Arc::from(q)
+            queue: Arc::from(q),
+            malsmug_dir: app_home_dir
         }
     }
 }
@@ -357,6 +374,8 @@ impl AppMethods for App {
     async fn start(&self) -> anyhow::Result<()> {
         let inner_queue = self.queue.clone();
         let inner_store = self.store.clone();
+        let inner_malsmug_dir = self.malsmug_dir.clone();
+
         let app = Router::new()
             .route("/analyse-file", post(analyse_file))
             .route("/delete-file-report/{file_report_uid}", delete(delete_file_report))
@@ -374,7 +393,7 @@ impl AppMethods for App {
                     inner_queue.get_sandbox_iocs_queue()).await {
                         Ok(mut c) => {
                             // initialize the dynamic analyzer ready to process incoming events
-                            let mut dynamic_analyser = DastAnalyzer::new();
+                            let mut dynamic_analyser = DastAnalyzer::new(inner_malsmug_dir);
 
                             while let Some(delivery) = c.next().await {
                                 match delivery {

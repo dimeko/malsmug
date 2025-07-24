@@ -3,6 +3,7 @@ use std::{ffi::OsStr, fs, io::Read, path::{Path, PathBuf}};
 use serde::{Deserialize};
 use regex::Regex;
 use serde_yaml::Error;
+use std::env;
 
 pub fn contains_html_like_code(input: &str) -> bool {
     let html_regex = Regex::new(r"<\s*!?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>|</\s*[a-zA-Z][a-zA-Z0-9]*\s*>").unwrap();
@@ -29,6 +30,15 @@ pub fn parse_file_extension_of_file(file_name: String) -> String {
     Path::new(file_name.as_str())
         .extension()
         .and_then(OsStr::to_str).unwrap_or("").to_string()
+}
+
+pub fn get_env_var(var: &str) -> Option<String> {
+    for (key, value) in env::vars() {
+        if key == var {
+            return Some(value)
+        }
+    }
+    None
 }
 
 #[cfg(test)]

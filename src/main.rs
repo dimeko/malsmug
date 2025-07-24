@@ -1,3 +1,7 @@
+extern crate dotenv;
+
+use dotenv::dotenv;
+
 use clap::{Parser};
 use env_logger::Builder;
 
@@ -6,6 +10,7 @@ mod utils;
 mod app;
 mod analysis;
 mod bootstrap;
+mod integrations;
 
 use crate::app::AppMethods;
 
@@ -33,7 +38,10 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
+    // build default logger
     let mut builder = Builder::from_default_env();
+    // load all the env variables from .env
+    dotenv().ok();
 
     let mut log_level: log::LevelFilter = log::LevelFilter::Warn;
     let cli_args = Args::parse();
