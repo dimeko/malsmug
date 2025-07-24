@@ -5,7 +5,9 @@ use log::info;
 use models::FileAnalysisReport;
 use sqlx::{migrate::MigrateDatabase, Sqlite};
 
-const DATABASE_URL: &str = "sqlite:/home/dimeko/dev/malsmug/malsmug.db";
+use crate::utils;
+
+// const DATABASE_URL: &str = "sqlite:/home/dimeko/dev/malsmug/malsmug.db";
 
 pub trait FileAnalysisReportStoreTraitClone {
     fn clone_box(&self) -> Box<dyn FileAnalysisReportStoreTrait>;
@@ -61,22 +63,30 @@ impl Store {
     pub async fn new(driver: &str) -> Self {
         let store: Store = match driver {
             "sqlite" => {
-                if !Sqlite::database_exists(DATABASE_URL).await.unwrap_or(false) {
-                    info!("Creating database {}", DATABASE_URL);
-                    match Sqlite::create_database(DATABASE_URL).await {
-                        Ok(_) => println!("Create db success"),
-                        Err(error) => panic!("error: {}", error),
+                match utils::get_env_var("DATABASE_URL") {
+                    Some(v) => {
+                        if !Sqlite::database_exists(&v).await.unwrap_or(false) {
+                            info!("Creating database {}", v);
+                            match Sqlite::create_database(&v).await {
+                                Ok(_) => println!("Create db success"),
+                                Err(error) => panic!("error: {}", error),
+                            }
+                        } else {
+                            info!("Database already exists");
+                        }
+                        let pool = sqlx::SqlitePool::connect(&v).await.unwrap();
+                        Store {
+                            driver: "sqlite".to_string(),
+                            db: DB {
+                                file_analysis_report: Box::new(sqlite::FileAnalysisReportStore::new(pool))
+                            }
+                        }
+                    },
+                    None => {
+                        panic!("Could not determine sqlite db url");
                     }
-                } else {
-                    info!("Database already exists");
                 }
-                let pool = sqlx::SqlitePool::connect(DATABASE_URL).await.unwrap();
-                Store {
-                    driver: "sqlite".to_string(),
-                    db: DB {
-                        file_analysis_report: Box::new(sqlite::FileAnalysisReportStore::new(pool))
-                    }
-                }
+
             },
             _ => {
                 panic!("Unsupported database driver: {:?}", driver);

@@ -1,5 +1,9 @@
+use std::fs;
+use std::fs::create_dir_all;
 use std::io::Read;
 use std::fs::File;
+use std::path::Path;
+use std::path::PathBuf;
 use serde::Deserialize;
 use serde_json::Value;
 use log::{error, warn, debug, info};
@@ -7,12 +11,15 @@ use std::collections::HashMap;
 use url::Url;
 use publicsuffix::{Psl, List};
 use std::str;
+use sha256;
 
 use crate::analysis::analyzer::Finding;
+use crate::integrations::virus_total::VTClient;
 use crate::store::models::FileAnalysisReport;
 use crate::utils;
 use crate::analysis::analyzer;
 use crate::analysis::dast_ioc_types;
+
 use dast_ioc_types::IoCValue;
 
 const KNOWN_SENSITIVE_DATA_KEYS: [&str; 5] = [
@@ -51,14 +58,25 @@ struct SpamHausResponse {
 #[derive(Clone)]
 pub struct DastAnalyzer {
     cached_domain_reputations: HashMap<String, f32>,
+    malsmug_dir: PathBuf,
+    tmp_dir: PathBuf
     // file_hash_events:  Vec<dast_event_types::Event>,
     // file_hash_findings: Vec<Finding>,
 }
 
 impl DastAnalyzer {
-    pub fn new() -> Self {
+    pub fn new(h_dir: PathBuf) -> Self {
+        let _tmp_dir = h_dir.join(PathBuf::from("dynamic_analysis_tmp"));
+        match create_dir_all(&_tmp_dir) {
+            Ok(_) => (),
+            Err(_) => {
+                panic!("could not create home dir");
+            }
+        };
         DastAnalyzer { 
             cached_domain_reputations: HashMap::new(),
+            malsmug_dir: h_dir.clone(),
+            tmp_dir: _tmp_dir
         }
     }
 
@@ -241,7 +259,42 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     }
                 },
                 IoCValue::IoCSuspiciousFileDownload(_v) => {
-                    
+                    match utils::get_env_var("VIRUS_TOTAL_API_KEY") {
+                        Some(v) => {
+                            let file_sha256 = sha256::digest(&_v.clone().data).to_string();
+                            let tmp_file_path = self.tmp_dir.join(PathBuf::from(&file_sha256));
+                            match fs::write(&tmp_file_path, _v.clone().data) {
+                                Ok(_) => {
+                                    let vtclient: VTClient = VTClient::new(&v);
+                                    match vtclient.scan_file(tmp_file_path.as_os_str().to_str().unwrap(), &file_sha256) {
+                                        Ok(r) => {
+                                            if r > 6 {
+                                                findings.push(
+                                                    analyzer::Finding {
+                                                        r#type: analyzer::AnalysisType::Dynamic,
+                                                        ioc: IoCValue::IoCSuspiciousFileDownload(_v.clone()),
+                                                        executed_on: ioc.executed_on.clone(), 
+                                                        severity: analyzer::Severity::High,
+                                                        poc: _v.url,
+                                                        title: "malicious file was downloaded".to_string()
+                                                    });
+                                            }
+                                           
+                                        },
+                                        Err(e) =>{
+                                            error!("error analysing the file: {:?}", e);
+                                        }
+                                    }
+                                },
+                                Err(_) => {
+                                    error!("Could not create tmp file for: {:?}", file_sha256)
+                                }
+                            }
+                        },
+                        None => {
+                            warn!("could not get VIRUS_TOTAL_API_KEY")
+                        }
+                    }
                 }
                 IoCValue::IoCNewNetworkHtmlElement(_v) => {
                     if self.clone()._is_bad_domain_reputation(self._get_domain_reputation(&_v.src.as_str()).await) {
