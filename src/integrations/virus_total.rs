@@ -9,7 +9,7 @@ pub struct VTClient<'a> {
 }
 
 impl<'a> VTClient<'a> {
-    pub fn new(api_key: &str) -> VTClient {
+    pub fn new(api_key: &'a str) -> VTClient<'a> {
         VTClient {
             vt_client: VtClient::new(&api_key)
         }

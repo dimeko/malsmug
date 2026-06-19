@@ -1,5 +1,5 @@
 
-use std::{fs::create_dir_all, os, path::PathBuf, sync::Arc, time::{self}};
+use std::{fs::create_dir_all, path::PathBuf, sync::Arc, time::{self}};
 use async_std::{stream::StreamExt};
 use lapin::options::BasicAckOptions;
 use tokio::task;

@@ -9,6 +9,12 @@ Architecture diagram:
 Before building we have to set the nightly builder in order to be able to use `oxc`
 ```bash
 rustup override set nightly --path .
+
+# Need rust newer than 1.94.0 to install sqlx-cli
+rustup update
+
+# Instal sqlx-cli to manage the database
+cargo install sqlx-cli
 ```
 Build RabbitMQ and Sandbox/Consumer images:
 ```bash

@@ -2,7 +2,7 @@ use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{analysis::dast_ioc_types::{self, IoC, IoCValue}, store::models::FileAnalysisReport};
+use crate::{analysis::dast_ioc_types::{self, IoCValue}, store::models::FileAnalysisReport};
 
 #[allow(dead_code)]
 #[repr(i64)]
