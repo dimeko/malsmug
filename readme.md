@@ -64,6 +64,7 @@ Finally everything is running. Now you can submit files to the application api a
     - `dynamic_analysis`: perform dynamic analysis
     - `static_analysis`: perform static analysis
 
+
     ```bash
     curl --location 'http://127.0.0.1:11234/analyse-file' \
     --form 'file_for_analysis=@"/file/for/analysis/local-path/file.js"' \
@@ -83,7 +84,7 @@ Finally everything is running. Now you can submit files to the application api a
     ```
 
 - Submit page for analysis
-    - `page_for_analysis`: a suspicious page that you want to analyse
+    `page_for_analysis`: a suspicious page that you want to analyse
 
     ```bash
     curl --location 'http://127.0.0.1:11234/analyse-file' \
@@ -184,16 +185,6 @@ Finally everything is running. Now you can submit files to the application api a
       }
     }
   ```
-    
-#### static analysis ioc(s)
-
-- expression including eval (ast)
-- expression including execScript (ast)
-- call of `document.write` with potential html elements as arguments (regex or ast)
-
-Some identifiers from `oxc` Abstract Syntax Tree:
-- StaticMemberExpression function calls: `CallExpression -> callee:StaticMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]`
-- ComputedMemberExpression function calls:  `CallExpression -> callee:ComputedMemberExpression -> object: Identifier . property: IdentifierName -> arguments: Vec[BinaryExpression (rec)]`
 
 #### dynamic analysis ioc(s)
 
