@@ -186,7 +186,7 @@ Finally everything is running. Now you can submit files to the application api a
     }
   ```
 
-#### dynamic analysis ioc(s)
+#### Dynamic analysis IOC(s)
 
 - call of `cookie.get`
 - call of `cookie.set`
