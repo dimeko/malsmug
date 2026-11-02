@@ -94,7 +94,7 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
             }
             let byte_array = Array.from(await response.content())
             let ioc = {
-                type: types.IoCType.SuspiciousFileDownload,
+                ioc_type: types.IoCType.SuspiciousFileDownload,
                 timestamp: Date.now(),
                 executed_on: baitWebsite,
                 value: {
@@ -135,7 +135,7 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
             return
         }
 
-        if (ioc.type == types.IoCType.SetTimeout) {
+        if (ioc.ioc_type == types.IoCType.SetTimeout) {
             let setTimeoutDelay = (ioc.value as types.IoCSetTimeout).delay
             analysis_debug(
                 'setTimeout was set with delay: ',

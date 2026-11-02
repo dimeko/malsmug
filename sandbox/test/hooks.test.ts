@@ -30,7 +30,7 @@ const NewNetworkElement = types.IoCType.NewNetworkHtmlElement;
 function assert_rust_compatible(p: HookedPage) {
     assert.ok(p.iocs.length > 0, "expected at least one ioc");
     for (const ioc of p.iocs) {
-        assert.ok(matches_rust_types(ioc.type, ioc.value), `not accepted by rust: ${JSON.stringify(ioc)}`);
+        assert.ok(matches_rust_types(ioc.ioc_type, ioc.value), `not accepted by rust: ${JSON.stringify(ioc)}`);
     }
 }
 

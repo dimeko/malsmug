@@ -41,8 +41,10 @@ function sanitize_ioc(reported: unknown): types.IoC | null {
             sanitized_value = { elementType: as_text(value.elementType), src: as_text(value.src) }
             break;
         case types.IoCType.SetCookie:
+            sanitized_value = { set_cookie: as_text(value.cookie) }
+            break;
         case types.IoCType.GetCookie:
-            sanitized_value = { cookie: as_text(value.cookie) }
+            sanitized_value = { gotten_cookie: as_text(value.cookie) }
             break;
         case types.IoCType.AddEventListener:
             sanitized_value = { listener: as_text(value.listener) }
@@ -56,7 +58,7 @@ function sanitize_ioc(reported: unknown): types.IoC | null {
     }
 
     return {
-        type: type,
+        ioc_type: type,
         executed_on: "",
         timestamp: Number.isSafeInteger(timestamp) && timestamp >= 0 ? timestamp : Date.now(),
         value: sanitized_value

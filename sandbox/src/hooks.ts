@@ -23,7 +23,7 @@ function place_hooks(reportFnName: string) {
         const originalSetItem = window.localStorage.setItem;
         window.localStorage.setItem = function (key: string, value: string) {
             let _event: types.IoC = {
-                type: types.IoCType.FunctionCall,
+                ioc_type: types.IoCType.FunctionCall,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -39,7 +39,7 @@ function place_hooks(reportFnName: string) {
         const originalGetItem = window.localStorage.getItem;
         window.localStorage.getItem = function (key: string) {
             let _event: types.IoC = {
-                type: types.IoCType.FunctionCall,
+                ioc_type: types.IoCType.FunctionCall,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -59,7 +59,7 @@ function place_hooks(reportFnName: string) {
         const originalDocumentWrite = document.write;
         document.write = function (code: string, ...rest: string[]) {
             let _event: types.IoC = {
-                type: types.IoCType.FunctionCall,
+                ioc_type: types.IoCType.FunctionCall,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -75,7 +75,7 @@ function place_hooks(reportFnName: string) {
         const originalEval = window.eval;
         window.eval = function (code: string) {
             let _event: types.IoC = {
-                type: types.IoCType.FunctionCall,
+                ioc_type: types.IoCType.FunctionCall,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -95,7 +95,7 @@ function place_hooks(reportFnName: string) {
             const originalExecScript = (window as any).execScript;
             window.eval = function (code: string) {
                 let _event: types.IoC = {
-                    type: types.IoCType.FunctionCall,
+                    ioc_type: types.IoCType.FunctionCall,
                     timestamp: Date.now(),
                     executed_on: "",
                     value: {
@@ -112,7 +112,7 @@ function place_hooks(reportFnName: string) {
         const originalFetch = window.fetch;
         window.fetch = function (...args) {
             let _event: types.IoC = {
-                type: types.IoCType.HttpRequest,
+                ioc_type: types.IoCType.HttpRequest,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -129,7 +129,7 @@ function place_hooks(reportFnName: string) {
         const originalWindowOpen = window.open;
         window.open = function (...args) {
             let _event: types.IoC = {
-                type: types.IoCType.HttpRequest,
+                ioc_type: types.IoCType.HttpRequest,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -147,7 +147,7 @@ function place_hooks(reportFnName: string) {
         const originalXHROpen = window.XMLHttpRequest.prototype.open;
         window.XMLHttpRequest.prototype.open = function(...args: any) {
             let _event: types.IoC = {
-                type: types.IoCType.HttpRequest,
+                ioc_type: types.IoCType.HttpRequest,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -168,7 +168,7 @@ function place_hooks(reportFnName: string) {
             try {
 
                 let _event: types.IoC = {
-                    type: types.IoCType.HttpRequest,
+                    ioc_type: types.IoCType.HttpRequest,
                     timestamp: Date.now(),
                     executed_on: "",
                     value: {
@@ -192,11 +192,11 @@ function place_hooks(reportFnName: string) {
             get: function () {
                 const cookies = (cookieDescriptor.get as () => string).call(document);
                 let _event: types.IoC = {
-                    type: types.IoCType.GetCookie,
+                    ioc_type: types.IoCType.GetCookie,
                     timestamp: Date.now(),
                     executed_on: "",
                     value: {
-                        cookie: cookies,
+                        gotten_cookie: cookies,
                     } as types.IoCGetCookie
                 };
                 (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
@@ -205,11 +205,11 @@ function place_hooks(reportFnName: string) {
             },
             set: function (value) {
                 let _event: types.IoC = {
-                    type: types.IoCType.SetCookie,
+                    ioc_type: types.IoCType.SetCookie,
                     timestamp: Date.now(),
                     executed_on: "",
                     value: {
-                        cookie: value,
+                        set_cookie: value,
                     } as types.IoCSetCookie
                 };
                 (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event);
@@ -221,7 +221,7 @@ function place_hooks(reportFnName: string) {
         let originalAddEventListener = document.addEventListener
         document.addEventListener = function(listener: string, fn: any, ...rest: any[]) {
             let _event: types.IoC = {
-                type: types.IoCType.AddEventListener,
+                ioc_type: types.IoCType.AddEventListener,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -240,7 +240,7 @@ function place_hooks(reportFnName: string) {
             ...args: any[]
         ): any {
             let _event: types.IoC = {
-                type: types.IoCType.SetTimeout,
+                ioc_type: types.IoCType.SetTimeout,
                 timestamp: Date.now(),
                 executed_on: "",
                 value: {
@@ -265,7 +265,7 @@ function place_hooks(reportFnName: string) {
         //     ...args: any[]
         // ): any {
         //     let _event: types.IoC = {
-        //         type: types.IoCType.SetInterval,
+        //         ioc_type: types.IoCType.SetInterval,
         //         timestamp: Date.now(),
         //         executed_on: "",
         //         value: {
@@ -291,7 +291,7 @@ function place_hooks(reportFnName: string) {
                         // elements without a url (e.g. inline scripts) make no network request
                         if(element_type in known_network_dom_elements && element_src !== null) {
                             let _event: types.IoC = {
-                                type: types.IoCType.NewNetworkHtmlElement,
+                                ioc_type: types.IoCType.NewNetworkHtmlElement,
                                 timestamp: Date.now(),
                                 executed_on: "",
                                 value: {

@@ -106,7 +106,7 @@ class HookedPage {
     }
 
     of_type(type: types.IoCType): any[] {
-        return this.iocs.filter(i => i.type === type).map(i => i.value);
+        return this.iocs.filter(i => i.ioc_type === type).map(i => i.value);
     }
 
     // for reports coming from places that a flush cannot follow, e.g. other frames
