@@ -121,7 +121,7 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     // a random string suffix is created every time the analyser runs to make
     // sure Javascript cannot find and call our hook and mess with the analyser
     var random_string = rsg()
-    var reportIocFunctionName = 'reportIoC' + random_string;
+    var reportIocFunctionName = random_string;
     analysis_info('report Ioc function name:', reportIocFunctionName);
 
     // here we actually push iocs to the their final destination, the sandbox_ioc_queue

@@ -4,6 +4,7 @@
   "description": "Mini behavioral analysis on Javascript samples",
   "scripts": {
     "build": "tsc -p .",
+    "test": "ts-node test/hooks.test.ts",
     "start": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/app.ts"
   },
   "main": "./dist/app.js",

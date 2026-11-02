@@ -69,6 +69,13 @@ docker compose run --rm -T -e LOG_LEVEL=debug sandbox-dev -f /samples/file.js
 docker compose run --rm -T sandbox-dev -p -w https://malicious.com
 ```
 
+The tests of the Javascript hooks run in a real browser. Tests marked as `todo` describe known gaps of the hooks, they are listed in the results but do not fail the suite:
+```bash
+cd sandbox && npm test
+# or without a local Chrome
+docker compose run --rm --entrypoint "./node_modules/.bin/ts-node test/hooks.test.ts" sandbox-dev
+```
+
 Finally everything is running. Now you can submit files to the application api and retrieve the ananalysis results synchronously.
 
 - Submit file for analysis
