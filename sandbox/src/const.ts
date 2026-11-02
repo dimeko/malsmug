@@ -1,19 +1,5 @@
 import * as types from "./types";
 
-const known_network_dom_elements: {[key: string]:string} = {
-    "form": "action",
-    "img": "src",
-    "audio": "src",
-    "source": "src",
-    "video": "src",
-    "track": "src",
-    "script": "src",
-    "link": "href",
-    "iframe": "src",
-    "object": "src",
-    "embed": "src"
-};
-
 const malicious_mime_types = [
     "application/octet-stream",
     "application/java-archive",
@@ -82,6 +68,5 @@ const default_rabbitmq_conf: types.RabbitMQConfig = {
 
 export {
     default_rabbitmq_conf,
-    malicious_mime_types,
-    known_network_dom_elements
+    malicious_mime_types
 }

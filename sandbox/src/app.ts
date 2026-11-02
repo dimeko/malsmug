@@ -111,17 +111,12 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         analysis_warn("new page loaded: ", target)
     })
 
-    // visiting bait_websites
-    await page.goto(baitWebsite, {
-        waitUntil: ['domcontentloaded', 'networkidle0']
-    });
-    analysis_info("Hooking JavaScript APIs...");
-
-    page.on('console', message => {
-        dom_console(message.text());
-    })
-
     let max_delay = 0;
+
+    // the bait website's own activity while loading is not part of the sample's behaviour.
+    // This lives here and not in the browser, so that Javascript cannot change it.
+    // When just checking a page, the page itself is what is being analysed.
+    let reporting = justCheckPage;
 
     // a random string suffix is created every time the analyser runs to make
     // sure Javascript cannot find and call our hook and mess with the analyser
@@ -132,6 +127,8 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     // here we actually push iocs to the their final destination, the sandbox_ioc_queue
     // we can perform any kind of normalization to the event
     await page.exposeFunction(reportIocFunctionName, (ioc: types.IoC) => {
+        if (!reporting) return
+
         if (ioc.type == types.IoCType.SetTimeout) {
             let setTimeoutDelay = (ioc.value as types.IoCSetTimeout).delay
             analysis_debug(
@@ -148,19 +145,22 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
             );
         }
     });
-    const place_hooks_source_code = place_hooks.toString();
 
-    // we have to also set a random string suffix at the name of the place_hooks function
-    // as Javascript can interact with it as soon as it is placed in the browser and possibly
-    // prevent hooking!
+    // the hooks run before any script of every new document, so they survive navigations
+    // and they are not left behind as a global function that Javascript can interact with
+    analysis_info("Hooking JavaScript APIs...");
+    await page.evaluateOnNewDocument(place_hooks, reportIocFunctionName);
+
+    // visiting bait_websites
+    await page.goto(baitWebsite, {
+        waitUntil: ['domcontentloaded', 'networkidle0']
+    });
+
+    page.on('console', message => {
+        dom_console(message.text());
+    })
+
     try {
-        let place_hooks_wrapper = `
-            ${place_hooks_source_code}
-
-            place_hooks("${reportIocFunctionName}")
-        `;
-        // set the hooks in the browser
-        await page.evaluate(place_hooks_wrapper);
         analysis_info(`Executing sample`);
     
         let fileHash = ""
@@ -169,7 +169,8 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
             const scriptCode = fs.readFileSync(sampleFile, "utf-8");
             fileHash = sha256(scriptCode)
     
-            // run the sample file in the browser     
+            // run the sample file in the browser
+            reporting = true
             await page.evaluate(scriptCode);
         }
         

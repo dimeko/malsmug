@@ -1,7 +1,24 @@
 import * as types from "./types";
-import { known_network_dom_elements } from "./const"
 
+// place_hooks is serialized and runs inside the browser, so it cannot use values
+// imported from other modules (types are fine, they are erased or inlined when compiling)
 function place_hooks(reportFnName: string) {
+    const known_network_dom_elements: {[key: string]:string} = {
+        "form": "action",
+        "img": "src",
+        "audio": "src",
+        "source": "src",
+        "video": "src",
+        "track": "src",
+        "script": "src",
+        "link": "href",
+        "iframe": "src",
+        "object": "src",
+        "embed": "src"
+    };
+
+    // accessing localStorage throws on opaque origins (e.g. sandboxed iframes),
+    // this should not prevent the rest of the hooks from being placed
     try {
         const originalSetItem = window.localStorage.setItem;
         window.localStorage.setItem = function (key: string, value: string) {
@@ -34,9 +51,13 @@ function place_hooks(reportFnName: string) {
 
             return originalGetItem.apply(this, [key] as [key: string]);
         };
+    } catch(err) {
+        console.log("Could not hook localStorage: ", err)
+    }
 
+    try {
         const originalDocumentWrite = document.write;
-        document.write = function (code: string) {
+        document.write = function (code: string, ...rest: string[]) {
             let _event: types.IoC = {
                 type: types.IoCType.FunctionCall,
                 timestamp: Date.now(),
@@ -48,7 +69,7 @@ function place_hooks(reportFnName: string) {
             };
             (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
 
-            return originalDocumentWrite.apply(this, [code] as [code: string]);
+            return originalDocumentWrite.apply(this, [code, ...rest]);
         };
 
         const originalEval = window.eval;
@@ -164,20 +185,23 @@ function place_hooks(reportFnName: string) {
             }
         }
 
-        let originalCookies = document.cookie;
+        // hooks are also active while the bait website loads, so cookies must
+        // keep working for real
+        const cookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, "cookie") as PropertyDescriptor;
         Object.defineProperty(document, "cookie", {
             get: function () {
+                const cookies = (cookieDescriptor.get as () => string).call(document);
                 let _event: types.IoC = {
                     type: types.IoCType.GetCookie,
                     timestamp: Date.now(),
                     executed_on: "",
                     value: {
-                        cookie: originalCookies,
+                        cookie: cookies,
                     } as types.IoCGetCookie
                 };
                 (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
 
-                return originalCookies;
+                return cookies;
             },
             set: function (value) {
                 let _event: types.IoC = {
@@ -188,14 +212,14 @@ function place_hooks(reportFnName: string) {
                         cookie: value,
                     } as types.IoCSetCookie
                 };
-                (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
+                (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event);
 
-                originalCookies += value + "; "; 
+                (cookieDescriptor.set as (v: string) => void).call(document, value);
             }
         });
 
         let originalAddEventListener = document.addEventListener
-        document.addEventListener = function(listener: string, fn: any) {
+        document.addEventListener = function(listener: string, fn: any, ...rest: any[]) {
             let _event: types.IoC = {
                 type: types.IoCType.AddEventListener,
                 timestamp: Date.now(),
@@ -206,7 +230,7 @@ function place_hooks(reportFnName: string) {
             };
             (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
 
-            return originalAddEventListener.apply(this, [listener, fn] as [listener: string, fn: any]);
+            return originalAddEventListener.apply(this, [listener, fn, ...rest] as [listener: string, fn: any, options?: any]);
         };
 
         let originalSetTimeout = setTimeout
@@ -262,14 +286,17 @@ function place_hooks(reportFnName: string) {
             for (const mutation of mutationList) {
                 mutation.addedNodes.forEach((node: Node, key: number, parent: NodeList) => {
                     if (node.ELEMENT_NODE == node.nodeType) {
-                        if(node.nodeName.toLowerCase() in known_network_dom_elements) {
+                        const element_type = node.nodeName.toLowerCase();
+                        const element_src = (node as HTMLElement).getAttribute(known_network_dom_elements[element_type]);
+                        // elements without a url (e.g. inline scripts) make no network request
+                        if(element_type in known_network_dom_elements && element_src !== null) {
                             let _event: types.IoC = {
                                 type: types.IoCType.NewNetworkHtmlElement,
                                 timestamp: Date.now(),
                                 executed_on: "",
                                 value: {
-                                    elementType: node.nodeName.toLowerCase(),
-                                    src: (node as HTMLElement).getAttribute(known_network_dom_elements[node.nodeName.toLowerCase()])
+                                    elementType: element_type,
+                                    src: element_src
                                 } as types.IoCNewNetworkHtmlElement
                             };
                             (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)
