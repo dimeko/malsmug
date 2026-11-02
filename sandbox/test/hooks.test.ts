@@ -3,11 +3,11 @@ import { after, afterEach, before, describe, it } from "node:test";
 import { Browser } from "puppeteer";
 import { HookedPage, TestServer, launch_browser, matches_rust_types } from "./harness";
 import * as types from "../src/types";
+import { sanitize_ioc } from "../src/utils";
 
 // Tests marked as `todo` describe the behaviour we want from a hook but do not have
 // yet. They run and they are listed in the results, but they do not fail the suite.
 
-const LOST_REPORT = "breaks the report: the main application rejects it as a whole";
 const BYPASS = "evasion: the sample can avoid the hook this way";
 
 let browser: Browser;
@@ -141,7 +141,7 @@ describe("localStorage.setItem", () => {
         assert.equal(await p.run(`localStorage.length`), 0);
     });
 
-    it("reports non string values as strings", { todo: LOST_REPORT }, async () => {
+    it("reports non string values as strings", async () => {
         const p = await open();
         await p.run(`localStorage.setItem("k", 1)`);
         assert_rust_compatible(p);
@@ -220,7 +220,7 @@ describe("document.write", () => {
         assert.deepEqual(p.of_type(FunctionCall)[0].arguments, ["a", "b"]);
     });
 
-    it("reports non string arguments as strings", { todo: LOST_REPORT }, async () => {
+    it("reports non string arguments as strings", async () => {
         const p = await open();
         await p.run(`document.write(1)`);
         assert_rust_compatible(p);
@@ -267,7 +267,7 @@ describe("window.eval", () => {
         assert.equal(await p.run(`window.eval(42)`), 42);
     });
 
-    it("reports non string arguments as strings", { todo: LOST_REPORT }, async () => {
+    it("reports non string arguments as strings", async () => {
         const p = await open();
         await p.run(`window.eval(42)`);
         assert_rust_compatible(p);
@@ -367,10 +367,16 @@ describe("window.fetch", () => {
         assert.equal(p.of_type(HttpRequest)[0].data, "stolen");
     });
 
-    it("reports the url of a Request object", { todo: LOST_REPORT }, async () => {
+    it("keeps the report valid with a Request object", async () => {
         const p = await open();
         await p.run(`fetch(new Request("/echo"))`);
         assert_rust_compatible(p);
+    });
+
+    it("reports the url of a Request object", { todo: "a Request reaches node as {}, only the hook can read its url" }, async () => {
+        const p = await open();
+        await p.run(`fetch(new Request("/echo"))`);
+        assert.equal(p.of_type(HttpRequest)[0].url, server.origin + "/echo");
     });
 });
 
@@ -391,7 +397,7 @@ describe("window.open", () => {
         assert.equal(await p.run(`window.open("/other", "named_window", "width=100,height=100").name`), "named_window");
     });
 
-    it("reports a call without url", { todo: LOST_REPORT }, async () => {
+    it("reports a call without url", async () => {
         const p = await open();
         await p.run(`window.open(); 0`);
         assert_rust_compatible(p);
@@ -510,7 +516,7 @@ describe("document.cookie", () => {
         assert.equal(await p.run(`document.cookie`), "");
     });
 
-    it("reports non string values as strings", { todo: LOST_REPORT }, async () => {
+    it("reports non string values as strings", async () => {
         const p = await open();
         await p.run(`document.cookie = 1`);
         assert_rust_compatible(p);
@@ -594,7 +600,7 @@ describe("setTimeout", () => {
     it("reports a call without delay", async () => {
         const p = await open();
         await p.run(`setTimeout(() => {}); 0`);
-        assert.deepEqual(p.of_type(SetTimeoutIoC), [{ arguments: [] }]);
+        assert.deepEqual(p.of_type(SetTimeoutIoC), [{ delay: 0, arguments: [] }]);
     });
 
     it("runs the callback with its arguments", async () => {
@@ -720,4 +726,47 @@ describe("network html elements", () => {
         await p.run(`new Image().src = "/resource"; 0`);
         assert.equal(p.of_type(NewNetworkElement).length, 1);
     });
+});
+
+describe("sanitize_ioc", () => {
+    for (const garbage of [null, undefined, 1, "x", [], {}, { type: "unknown", value: {} }, { value: { cookie: "a" } }]) {
+        it(`drops ${JSON.stringify(garbage)}`, () => {
+            assert.equal(sanitize_ioc(garbage), null);
+        });
+    }
+
+    it("keeps an ioc without a value valid", () => {
+        const ioc = sanitize_ioc({ type: FunctionCall }) as types.IoC;
+        assert.deepEqual(ioc.value, { callee: "", arguments: [] });
+    });
+
+    it("keeps strings untouched and converts everything else", () => {
+        const ioc = sanitize_ioc({ type: FunctionCall, value: { callee: "c", arguments: ["a", 1, true, null, { x: 1 }] } }) as types.IoC;
+        assert.deepEqual(ioc.value, { callee: "c", arguments: ["a", "1", "true", "null", `{"x":1}`] });
+    });
+
+    it("does not fail on arguments that are not a list", () => {
+        const ioc = sanitize_ioc({ type: FunctionCall, value: { callee: "c", arguments: "a" } }) as types.IoC;
+        assert.deepEqual(ioc.value, { callee: "c", arguments: [] });
+    });
+
+    it("removes fields that are not part of the ioc", () => {
+        const ioc = sanitize_ioc({ type: SetCookie, extra: 1, value: { cookie: "a", extra: 1 } }) as any;
+        assert.deepEqual(Object.keys(ioc).sort(), ["executed_on", "timestamp", "type", "value"]);
+        assert.deepEqual(ioc.value, { cookie: "a" });
+    });
+
+    for (const timestamp of [undefined, "1", -1, 1.5, null]) {
+        it(`replaces the timestamp ${JSON.stringify(timestamp)}`, () => {
+            const ioc = sanitize_ioc({ type: SetCookie, timestamp, value: {} }) as types.IoC;
+            assert.ok(Number.isSafeInteger(ioc.timestamp) && ioc.timestamp >= 0);
+        });
+    }
+
+    for (const [delay, expected] of [["1000", 1000], [undefined, 0], ["x", 0], [null, 0], [250, 250]] as [unknown, number][]) {
+        it(`turns the setTimeout delay ${JSON.stringify(delay)} into ${expected}`, () => {
+            const ioc = sanitize_ioc({ type: SetTimeoutIoC, value: { delay } }) as types.IoC;
+            assert.equal((ioc.value as types.IoCSetTimeout).delay, expected);
+        });
+    }
 });

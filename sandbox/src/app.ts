@@ -8,7 +8,7 @@ import rsg from "random-string-generator";
 import yaml from 'yaml';
 import { sha256 } from 'js-sha256';
 import { init_logger, analysis_debug, analysis_info, analysis_warn, analysis_error, dom_console } from "./logger";
-import { elide_byte_arrays } from "./utils";
+import { elide_byte_arrays, sanitize_ioc } from "./utils";
 import { default_rabbitmq_conf, malicious_mime_types } from "./const"
 import commandLineArgs from 'command-line-args'
 
@@ -126,8 +126,14 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
 
     // here we actually push iocs to the their final destination, the sandbox_ioc_queue
     // we can perform any kind of normalization to the event
-    await page.exposeFunction(reportIocFunctionName, (ioc: types.IoC) => {
+    await page.exposeFunction(reportIocFunctionName, (reported_ioc: unknown) => {
         if (!reporting) return
+
+        const ioc = sanitize_ioc(reported_ioc)
+        if (ioc === null) {
+            analysis_warn('dropping malformed ioc: ', reported_ioc);
+            return
+        }
 
         if (ioc.type == types.IoCType.SetTimeout) {
             let setTimeoutDelay = (ioc.value as types.IoCSetTimeout).delay

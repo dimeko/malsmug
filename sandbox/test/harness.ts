@@ -3,6 +3,7 @@ import { AddressInfo } from "net";
 import puppeteer, { Browser, BrowserContext, Page } from "puppeteer";
 import { place_hooks } from "../src/hooks";
 import * as types from "../src/types";
+import { sanitize_ioc } from "../src/utils";
 
 const REPORT_FN = "reportIoCForTests";
 const FLUSH = "__flush__";
@@ -75,8 +76,10 @@ class HookedPage {
         hooked.page = await hooked.context.newPage();
         if (options.user_agent) await hooked.page.setUserAgent(options.user_agent);
         if (options.before_hooks) await hooked.page.evaluateOnNewDocument(options.before_hooks);
-        await hooked.page.exposeFunction(REPORT_FN, (ioc: types.IoC) => {
-            if ((ioc.type as string) !== FLUSH) hooked.iocs.push(ioc);
+        await hooked.page.exposeFunction(REPORT_FN, (reported: any) => {
+            if (reported?.type === FLUSH) return;
+            const ioc = sanitize_ioc(reported);
+            if (ioc !== null) hooked.iocs.push(ioc);
         });
         await hooked.page.evaluateOnNewDocument(place_hooks, REPORT_FN);
         await hooked.page.goto(origin + (options.path || "/"), { waitUntil: "load" });

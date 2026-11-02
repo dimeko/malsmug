@@ -90,7 +90,8 @@ type IoC = {
     type: IoCType,
     executed_on: string,
     timestamp: number,
-    value: IoCHttpRequest | 
+    value: 
+        IoCHttpRequest | 
         IoCFunctionCall | 
         IoCNewNetworkHtmlElement | 
         IoCSetCookie | 
