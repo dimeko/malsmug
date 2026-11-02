@@ -1,14 +1,11 @@
-function validate_logging_level(lv: string): string {
-    switch(lv) {
-        case 'debug':{return 'debug'}
-        case 'info':{return 'info'}
-        case 'warn':{return 'warn'}
-        case 'warning':{return 'warn'}
-        case 'error':{return 'error'}
-        default:{return 'info'}
+// JSON.stringify replacer that keeps downloaded files out of a printed report
+function elide_byte_arrays(key: string, value: any): any {
+    if (key === "data" && Array.isArray(value)) {
+        return `<${value.length} bytes>`
     }
+    return value
 }
 
 export {
-    validate_logging_level
+    elide_byte_arrays
 }

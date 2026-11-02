@@ -1,0 +1,19 @@
+FROM ghcr.io/puppeteer/puppeteer:latest
+
+WORKDIR /sandbox
+
+USER root
+RUN chown -Rh pptruser:pptruser /sandbox
+
+USER pptruser
+
+COPY sandbox/package.json sandbox/package-lock.json sandbox/tsconfig.json ./
+
+ENV PUPPETEER_CACHE_DIR="/sandbox/puppeteer_cache"
+
+RUN npm ci
+RUN npx puppeteer browsers install chrome --path ./puppeteer_cache
+
+COPY sandbox/src/ ./src/
+
+ENTRYPOINT ["./node_modules/.bin/ts-node", "src/app.ts", "--dev"]
