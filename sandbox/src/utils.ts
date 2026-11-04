@@ -44,7 +44,7 @@ function sanitize_ioc(reported: unknown): types.IoC | null {
             sanitized_value = { set_cookie: as_text(value.cookie) }
             break;
         case types.IoCType.GetCookie:
-            sanitized_value = { gotten_cookie: as_text(value.cookie) }
+            sanitized_value = { got_cookie: as_text(value.cookie) }
             break;
         case types.IoCType.AddEventListener:
             sanitized_value = { listener: as_text(value.listener) }

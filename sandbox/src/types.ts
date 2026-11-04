@@ -80,7 +80,7 @@ type IoCSetCookie = {
 }
 
 type IoCGetCookie = {
-    gotten_cookie: string
+    got_cookie: string
 }
 
 type IoCAddEventListener = {

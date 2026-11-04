@@ -196,7 +196,7 @@ function place_hooks(reportFnName: string) {
                     timestamp: Date.now(),
                     executed_on: "",
                     value: {
-                        gotten_cookie: cookies,
+                        got_cookie: cookies,
                     } as types.IoCGetCookie
                 };
                 (window[reportFnName as keyof typeof window] as (event: types.IoC) => void)(_event)

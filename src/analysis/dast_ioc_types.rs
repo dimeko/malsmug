@@ -74,7 +74,7 @@ pub struct IoCSetCookie {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IoCGetCookie {
-    pub gotten_cookie: String
+    pub got_cookie: String
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -102,7 +102,7 @@ pub struct IoCAddEventListener {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "value_type", content = "value", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum IoCValue {
     IoCHttpRequest(IoCHttpRequest),
     IoCHttpResponse(IoCHttpResponse),
@@ -123,6 +123,5 @@ pub struct IoC {
     pub ioc_type: IoCType,
     pub executed_on: String,
     pub timestamp: u64,
-    #[serde(flatten)]
     pub value: IoCValue,
 }

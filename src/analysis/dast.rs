@@ -56,6 +56,13 @@ struct SpamHausResponse {
     dimensions: Value
 }
 
+struct Cookie<'a>(&'a str, &'a str);
+
+impl<'a> Cookie<'a> {
+    fn to_str(&self) -> String {
+        format!("{}={}", self.0, self.1)
+    }
+}
 #[derive(Clone)]
 pub struct DastAnalyzer {
     cached_domain_reputations: HashMap<String, f32>,
@@ -65,7 +72,7 @@ pub struct DastAnalyzer {
     // file_hash_findings: Vec<Finding>,
 }
 
-impl DastAnalyzer {
+impl<'a> DastAnalyzer {
     pub fn new(h_dir: PathBuf) -> Self {
         let _tmp_dir = h_dir.join(PathBuf::from("dynamic_analysis_tmp"));
         match create_dir_all(&_tmp_dir) {
@@ -93,6 +100,17 @@ impl DastAnalyzer {
 
     fn _is_bad_domain_reputation(self, s: f32) -> bool {
         return s <= 20.0 && s > 0.0
+    }
+
+    fn _cookie_parser(&self, cookies_str: &'a str) -> Vec<Cookie<'a>> {
+        let mut cookies: Vec<Cookie<'a>> = Vec::new();
+        for _cookie in cookies_str.split(";") {
+            let cookie_parts: Vec<&str> = _cookie.trim().split("=").collect();
+            if cookie_parts.len() == 2 {
+                cookies.push(Cookie(cookie_parts[0], cookie_parts[1]));
+            }
+        }
+        cookies
     }
 
     // fetches given domain reputation score from spamhaus.com
@@ -372,16 +390,19 @@ impl<'a> analyzer::DastAnalyze<'a> for DastAnalyzer {
                     }
                 },
                 IoCValue::IoCGetCookie(_v) => {
-                    if KNOWN_SENSITIVE_DATA_KEYS.contains(&_v.gotten_cookie.as_str()) {
+                    let cookie_parts: Vec<Cookie> = self._cookie_parser(_v.got_cookie.as_str());
+                    for cookie in cookie_parts {
+                        if KNOWN_SENSITIVE_DATA_KEYS.contains(&cookie.0) {
                             findings.push(
                                 analyzer::Finding {
                                     r#type: analyzer::AnalysisType::Dynamic,
-                                    ioc: IoCValue::IoCGetCookie(_v),
+                                    ioc: IoCValue::IoCGetCookie(_v.clone()),
                                     executed_on: ioc.executed_on.clone(), 
                                     severity: analyzer::Severity::VeryHigh,
                                     poc: "document.cookie".to_string(),
                                     title: "document.cookie tried to access sensitive data key".to_string()
                                 });
+                            }
                     }
                 },
                 IoCValue::IoCAddEventListener(_v) => {
@@ -468,7 +489,7 @@ mod tests {
     }
 
     fn get_cookie(cookie: &str) -> IoCValue {
-        IoCValue::IoCGetCookie(IoCGetCookie { gotten_cookie: cookie.to_string() })
+        IoCValue::IoCGetCookie(IoCGetCookie { got_cookie: cookie.to_string() })
     }
 
     fn assert_finding(finding: &Finding, severity: Severity, title: &str, poc: &str) {
@@ -768,10 +789,11 @@ mod tests {
     #[tokio::test]
     async fn cookie_that_is_exactly_a_sensitive_key_is_a_finding() {
         for key in KNOWN_SENSITIVE_DATA_KEYS {
-            let findings = analyze_one(get_cookie(key)).await;
+            let cookie = format!("{}=cookie_value", key);
+            let findings = analyze_one(get_cookie(&cookie)).await;
             assert_eq!(findings.len(), 1, "key {}", key);
             assert_finding(&findings[0], Severity::VeryHigh, "document.cookie tried to access sensitive data key", "document.cookie");
-            assert!(matches!(&findings[0].ioc, IoCValue::IoCGetCookie(v) if v.gotten_cookie == key));
+            assert!(matches!(&findings[0].ioc, IoCValue::IoCGetCookie(v) if v.got_cookie == cookie));
         }
     }
 
@@ -783,7 +805,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "known bug: document.cookie returns name=value pairs but the rule compares the whole string with the key"]
+    // #[ignore = "known bug: document.cookie returns name=value pairs but the rule compares the whole string with the key"]
     async fn cookie_string_with_a_sensitive_key_is_a_finding() {
         for cookie in ["PHPSESSID=abc", "theme=dark; PHPSESSID=abc"] {
             assert_eq!(analyze_one(get_cookie(cookie)).await.len(), 1, "cookie {}", cookie);
@@ -793,7 +815,7 @@ mod tests {
     // ---------------------------------------------------
     // iocs in the format the sandbox sends them, the way the main application reads them
     fn from_sandbox(ioc_type: &str, value: &str) -> IoC {
-        let json = format!(r#"{{"type":"{}","timestamp":1,"executed_on":"{}","value":{}}}"#, ioc_type, BAIT_WEBSITE, value);
+        let json = format!(r#"{{"ioc_type":"{}","timestamp":1,"executed_on":"{}","value":{}}}"#, ioc_type, BAIT_WEBSITE, value);
         serde_json::from_str(&json).unwrap_or_else(|e| panic!("could not parse {}: {}", json, e))
     }
 
@@ -814,16 +836,16 @@ mod tests {
     #[tokio::test]
     async fn sandbox_iocs_without_a_rule_are_accepted() {
         let findings = analyze_iocs(vec![
-            from_sandbox("set_cookie", r#"{"cookie":"a=b"}"#),
+            from_sandbox("set_cookie", r#"{"set_cookie":"a=b"}"#),
             from_sandbox("add_event_listener", r#"{"listener":"keydown"}"#),
         ]).await;
         assert!(findings.is_empty());
     }
 
     #[tokio::test]
-    #[ignore = "known bug: the untagged IoCValue parses get_cookie as IoCSetCookie, as both have the same fields"]
+    // #[ignore = "known bug: the untagged IoCValue parses get_cookie as IoCSetCookie, as both have the same fields"]
     async fn sandbox_get_cookie_reaches_its_rule() {
-        let findings = analyze_iocs(vec![from_sandbox("get_cookie", r#"{"cookie":"PHPSESSID"}"#)]).await;
+        let findings = analyze_iocs(vec![from_sandbox("get_cookie", r#"{"got_cookie":"PHPSESSID=asd"}"#)]).await;
         assert_eq!(titles(&findings), vec!["document.cookie tried to access sensitive data key"]);
     }
 }
