@@ -24,6 +24,7 @@ interface RabbitMQConfig {
     }
 }
 
+
 const enum IoCType {
     HttpRequest = "http_request",
     HttpResposne = "http_response",
@@ -75,11 +76,11 @@ type IoCNewNetworkHtmlElement = {
 }
 
 type IoCSetCookie = {
-    cookie: string
+    set_cookie: string
 }
 
 type IoCGetCookie = {
-    cookie: string
+    got_cookie: string
 }
 
 type IoCAddEventListener = {
@@ -87,10 +88,11 @@ type IoCAddEventListener = {
 }
 
 type IoC = {
-    type: IoCType,
+    ioc_type: IoCType,
     executed_on: string,
     timestamp: number,
-    value: IoCHttpRequest | 
+    value: 
+        IoCHttpRequest | 
         IoCFunctionCall | 
         IoCNewNetworkHtmlElement | 
         IoCSetCookie | 

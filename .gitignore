@@ -12,3 +12,6 @@ notes.txt
 js-samples
 .env
 .no_git
+
+./**/node_modules
+iocs.json

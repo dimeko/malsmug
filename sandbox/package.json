@@ -4,6 +4,7 @@
   "description": "Mini behavioral analysis on Javascript samples",
   "scripts": {
     "build": "tsc -p .",
+    "test": "ts-node test/hooks.test.ts",
     "start": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/app.ts"
   },
   "main": "./dist/app.js",
@@ -22,7 +23,7 @@
     "js-sha256": "^0.11.1",
     "log4js": "^6.9.1",
     "path": "^0.12.7",
-    "puppeteer": "^24.4.0",
+    "puppeteer": "^24.43.1",
     "random-string-generator": "^1.0.7",
     "yaml": "^2.8.0"
   },

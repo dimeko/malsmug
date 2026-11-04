@@ -69,12 +69,12 @@ pub struct IoCNewNetworkHtmlElement {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IoCSetCookie {
-    pub cookie: String
+    pub set_cookie: String
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IoCGetCookie {
-    pub cookie: String
+    pub got_cookie: String
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -120,7 +120,6 @@ pub enum IoCValue {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IoC {
-    #[serde(rename = "type")]
     pub ioc_type: IoCType,
     pub executed_on: String,
     pub timestamp: u64,

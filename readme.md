@@ -56,6 +56,26 @@ To run the full application follow the below steps with the given order:
     # LOG_LEVEL = debug | info | warn | error
     docker compose run -e LOG_LEVEL=debug sandbox
     ```
+
+To run only the TypeScript sandbox as a CLI tool, without RabbitMQ or the main application, use the `sandbox-dev` service. It prints the found IoCs as JSON on stdout (downloaded files are shown as `<N bytes>`), logs go to stderr and the sample is not deleted. `sandbox/src` is mounted in the container, so code changes need no rebuild. Samples are read from `./js-samples` or from `SAMPLES_FOLDER` if set:
+```bash
+mkdir -p js-samples
+docker compose build sandbox-dev
+
+docker compose run --rm -T sandbox-dev -f /samples/file.js -w https://facebook.com > iocs.json
+# LOG_LEVEL = debug | info | warn | error
+docker compose run --rm -T -e LOG_LEVEL=debug sandbox-dev -f /samples/file.js
+# visit the page only, without running a sample
+docker compose run --rm -T sandbox-dev -p -w https://malicious.com
+```
+
+The tests of the Javascript hooks run in a real browser. Tests marked as `todo` describe known gaps of the hooks, they are listed in the results but do not fail the suite:
+```bash
+cd sandbox && npm test
+# or without a local Chrome
+docker compose run --rm --entrypoint "./node_modules/.bin/ts-node test/hooks.test.ts" sandbox-dev
+```
+
 Finally everything is running. Now you can submit files to the application api and retrieve the ananalysis results synchronously.
 
 - Submit file for analysis

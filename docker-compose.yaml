@@ -26,6 +26,18 @@ services:
       - ${CONFIG_FOLDER}:/sandbox/config/
     cap_add:
       - NET_ADMIN # this capability is needed in case we want to block outgoing TCP traffic
+  sandbox-dev:
+    profiles:
+      - dev
+    build:
+      context: .
+      dockerfile: ./docker/dev_sandbox_Dockerfile
+    image: js-sandbox-dev
+    init: true
+    volumes:
+      - ./sandbox/src:/sandbox/src:ro
+      - ./sandbox/test:/sandbox/test:ro
+      - ${SAMPLES_FOLDER:-./js-samples}:/samples:ro
 
 configs:
   rabbitmq-plugins:
