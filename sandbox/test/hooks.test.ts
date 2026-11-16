@@ -59,7 +59,7 @@ describe("hook placement", () => {
     it("is active before the first script of the page", async () => {
         const p = await open({ path: "/inline-script" });
         await p.flush();
-        assert.deepEqual(p.of_type(SetCookie), [{ cookie: "from_inline=1" }]);
+        assert.deepEqual(p.of_type(SetCookie), [{ set_cookie: "from_inline=1" }]);
     });
 
     it("survives navigation", async () => {
@@ -483,13 +483,13 @@ describe("document.cookie", () => {
     it("reports a set", async () => {
         const p = await open();
         await p.run(`document.cookie = "a=b"`);
-        assert.deepEqual(p.of_type(SetCookie), [{ cookie: "a=b" }]);
+        assert.deepEqual(p.of_type(SetCookie), [{ set_cookie: "a=b" }]);
     });
 
     it("reports the attributes of a set", async () => {
         const p = await open();
         await p.run(`document.cookie = "a=b; path=/; max-age=60"`);
-        assert.deepEqual(p.of_type(SetCookie), [{ cookie: "a=b; path=/; max-age=60" }]);
+        assert.deepEqual(p.of_type(SetCookie), [{ set_cookie: "a=b; path=/; max-age=60" }]);
     });
 
     it("really sets the cookie", async () => {
@@ -502,7 +502,7 @@ describe("document.cookie", () => {
         const p = await open();
         await p.page.setCookie({ name: "real", value: "1", url: server.origin });
         assert.equal(await p.run(`document.cookie`), "real=1");
-        assert.deepEqual(p.of_type(GetCookie), [{ cookie: "real=1" }]);
+        assert.deepEqual(p.of_type(GetCookie), [{ got_cookie: "real=1" }]);
     });
 
     it("applies expirations", async () => {
@@ -729,43 +729,43 @@ describe("network html elements", () => {
 });
 
 describe("sanitize_ioc", () => {
-    for (const garbage of [null, undefined, 1, "x", [], {}, { type: "unknown", value: {} }, { value: { cookie: "a" } }]) {
+    for (const garbage of [null, undefined, 1, "x", [], {}, { ioc_type: "unknown", value: {} }, { value: { cookie: "a" } }]) {
         it(`drops ${JSON.stringify(garbage)}`, () => {
             assert.equal(sanitize_ioc(garbage), null);
         });
     }
 
     it("keeps an ioc without a value valid", () => {
-        const ioc = sanitize_ioc({ type: FunctionCall }) as types.IoC;
+        const ioc = sanitize_ioc({ ioc_type: FunctionCall }) as types.IoC;
         assert.deepEqual(ioc.value, { callee: "", arguments: [] });
     });
 
     it("keeps strings untouched and converts everything else", () => {
-        const ioc = sanitize_ioc({ type: FunctionCall, value: { callee: "c", arguments: ["a", 1, true, null, { x: 1 }] } }) as types.IoC;
+        const ioc = sanitize_ioc({ ioc_type: FunctionCall, value: { callee: "c", arguments: ["a", 1, true, null, { x: 1 }] } }) as types.IoC;
         assert.deepEqual(ioc.value, { callee: "c", arguments: ["a", "1", "true", "null", `{"x":1}`] });
     });
 
     it("does not fail on arguments that are not a list", () => {
-        const ioc = sanitize_ioc({ type: FunctionCall, value: { callee: "c", arguments: "a" } }) as types.IoC;
+        const ioc = sanitize_ioc({ ioc_type: FunctionCall, value: { callee: "c", arguments: "a" } }) as types.IoC;
         assert.deepEqual(ioc.value, { callee: "c", arguments: [] });
     });
 
     it("removes fields that are not part of the ioc", () => {
-        const ioc = sanitize_ioc({ type: SetCookie, extra: 1, value: { cookie: "a", extra: 1 } }) as any;
-        assert.deepEqual(Object.keys(ioc).sort(), ["executed_on", "timestamp", "type", "value"]);
-        assert.deepEqual(ioc.value, { cookie: "a" });
+        const ioc = sanitize_ioc({ ioc_type: SetCookie, extra: 1, value: { set_cookie: "a", extra: 1 } }) as any;
+        assert.deepEqual(Object.keys(ioc).sort(), ["executed_on", "ioc_type", "timestamp", "value"]);
+        assert.deepEqual(ioc.value, { set_cookie: "a" });
     });
 
     for (const timestamp of [undefined, "1", -1, 1.5, null]) {
         it(`replaces the timestamp ${JSON.stringify(timestamp)}`, () => {
-            const ioc = sanitize_ioc({ type: SetCookie, timestamp, value: {} }) as types.IoC;
+            const ioc = sanitize_ioc({ ioc_type: SetCookie, timestamp, value: {} }) as types.IoC;
             assert.ok(Number.isSafeInteger(ioc.timestamp) && ioc.timestamp >= 0);
         });
     }
 
     for (const [delay, expected] of [["1000", 1000], [undefined, 0], ["x", 0], [null, 0], [250, 250]] as [unknown, number][]) {
         it(`turns the setTimeout delay ${JSON.stringify(delay)} into ${expected}`, () => {
-            const ioc = sanitize_ioc({ type: SetTimeoutIoC, value: { delay } }) as types.IoC;
+            const ioc = sanitize_ioc({ ioc_type: SetTimeoutIoC, value: { delay } }) as types.IoC;
             assert.equal((ioc.value as types.IoCSetTimeout).delay, expected);
         });
     }

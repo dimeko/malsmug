@@ -1,0 +1,68 @@
+name: Unit tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# a new push to the same branch/PR cancels the run that is still going
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust core (cargo test)
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_TERM_COLOR: always
+      # the sqlx::query! macros check every query against a real database at compile
+      # time, and .sqlx (offline query data) is not committed, so CI builds one
+      DATABASE_URL: sqlite://${{ github.workspace }}/malsmug.db
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Create the database from the migrations
+        run: |
+          command -v sqlite3 || (sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3)
+          for migration in migrations/*.sql; do
+            sqlite3 malsmug.db < "$migration"
+          done
+
+      - name: Run tests
+        run: cargo test --locked
+
+  sandbox:
+    name: Sandbox hooks (npm test)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: sandbox
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: sandbox/package-lock.json
+
+      # puppeteer downloads Chrome on install, cache it between runs
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('sandbox/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
