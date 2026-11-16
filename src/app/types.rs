@@ -14,7 +14,9 @@ pub struct FileForAnalysis {
 pub struct EventsFromAnalysis {
     pub file_hash: String,
     pub analysis_id: String,
-    pub iocs: Vec<dast_ioc_types::IoC>
+    pub iocs: Vec<dast_ioc_types::IoC>,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 // HTTP types

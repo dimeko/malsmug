@@ -20,7 +20,8 @@ const cli_arg_options = [
     { name: 'sample-file', alias: 'f', type: String, defaultValue: "" },
     { name: 'bait-website', alias: 'w', type: String, defaultValue: "https://google.com" },
     { name: 'conf-folder', alias: 'c', type: String, defaultValue: "/sandbox/config" },
-    { name: 'analysis-id', alias: 'a', type: String, defaultValue: ""}
+    { name: 'analysis-id', alias: 'a', type: String, defaultValue: ""},
+    { name: 'output-file', alias: 'o', type: String, defaultValue: "" }
 ]
 
 const cli_args = commandLineArgs(cli_arg_options)
@@ -49,12 +50,10 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     analysis_info("Launching browser ...");
     const browser = await puppeteer.launch({
         headless: true,
-        dumpio: !cli_args.dev,
         args: [
             "--ignore-certificate-errors",
             "--disable-web-security",
             "--disable-gpu",
-            "--no-sandbox"
         ]
     });
 
@@ -81,42 +80,54 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
     page.on('request', request => {
         request.continue();
     });
+    // the bait website's own activity while loading is not part of the sample's behaviour.
+    // This lives here and not in the browser, so that Javascript cannot change it.
+    // When just checking a page, the page itself is what is being analysed.
+    let reporting = !justCheckPage;
+    // body fetches still running; awaited before the page is closed
+    const pendingDownloads: Promise<void>[] = [];
 
-    page.on('response', async response => {
-        const headers = response.headers();
-        if (malicious_mime_types.includes(headers["content-type"])) {
+    page.on('response', response => {
+        // the bait website's own resources are not the sample's behaviour
+        if (!reporting) return;
+
+        // "text/javascript; charset=utf-8" -> "text/javascript"
+        const contentType = (response.headers()["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+        if (!malicious_mime_types.includes(contentType)) return;
+
+        // redirects have no body
+        const status = response.status();
+        if (status >= 300 && status < 400) return;
+
+        pendingDownloads.push((async () => {
             analysis_debug('suspicious file download');
-            let file_extension = "";
+            let byte_array: number[] = [];
             try {
-                file_extension = headers["content-type"].split("/")[1]
-            } catch(err) {
-                analysis_debug('could not get downloaded file extension');
+                byte_array = Array.from(await response.content());
+            } catch (err) {
+                // body evicted / page closed: keep the IoC, just without data
+                analysis_debug(`could not read body of ${response.url()}: ${err}`);
             }
-            let byte_array = Array.from(await response.content())
-            let ioc = {
+            const ioc = {
                 ioc_type: types.IoCType.SuspiciousFileDownload,
                 timestamp: Date.now(),
                 executed_on: baitWebsite,
                 value: {
                     url: response.url(),
-                    extension: file_extension,
+                    extension: contentType.split("/")[1] ?? "",
                     data: byte_array
                 } as types.IoCSuspiciousFileDownload
-            }
+            };
             analysis_debug('adding ioc: ', ioc);
             iocs.push(ioc);
-        }
+        })());
     });
+
     browser.on('targetcreated', async target => {
         analysis_warn("new page loaded: ", target)
     })
 
     let max_delay = 0;
-
-    // the bait website's own activity while loading is not part of the sample's behaviour.
-    // This lives here and not in the browser, so that Javascript cannot change it.
-    // When just checking a page, the page itself is what is being analysed.
-    let reporting = justCheckPage;
 
     // a random string suffix is created every time the analyser runs to make
     // sure Javascript cannot find and call our hook and mess with the analyser
@@ -166,20 +177,26 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         dom_console(message.text());
     })
 
-    try {
-        analysis_info(`Executing sample`);
-    
-        let fileHash = ""
-        if(!justCheckPage){
-            // open the sample copy
-            const scriptCode = fs.readFileSync(sampleFile, "utf-8");
-            fileHash = sha256(scriptCode)
-    
-            // run the sample file in the browser
-            reporting = true
+    let fileHash = ""
+    if(!justCheckPage){
+        // open the sample copy
+        const sampleBytes = fs.readFileSync(sampleFile);
+        fileHash = sha256(sampleBytes)
+        const scriptCode = sampleBytes.toString("utf-8");
+
+        analysis_info(`Executing sample ${sampleFile}`);
+        // run the sample file in the browser
+        reporting = true
+        try {
             await page.evaluate(scriptCode);
+        } catch (err) {
+            // a sample that throws at runtime is a result, not an analyser failure:
+            // keep the IoCs it produced before the throw and continue with the Lure
+            analysis_warn(`sample threw at runtime: ${err}`);
         }
-        
+    }
+
+    try {
         // run the Lure          
         const lure = new Lure(page)
         analysis_debug(`Starting Lure`);
@@ -190,6 +207,7 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         await new Promise(resolve =>
             setTimeout(resolve, max_delay + 1000)
         );
+        await Promise.allSettled(pendingDownloads);
         await page.close();
 
         let iocs_for_analysis: types.IoCsFromAnalysis = {
@@ -200,7 +218,9 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         analysis_info(`found ${iocs_for_analysis.iocs.length} iocs`)
 
         if (cli_args.dev) {
-            console.log(JSON.stringify(iocs_for_analysis, elide_byte_arrays, 2))
+            // iocs_for_analysis.iocs.forEach(ioc => {
+            //     analysis_info(JSON.stringify(ioc, elide_byte_arrays, 2))
+            // });
         } else {
             await rbmqc.publish(rabbitmq_config.queues.sandbox_iocs_queue.name, iocs_for_analysis)
             try {
@@ -221,7 +241,12 @@ if (!fs.existsSync(sampleFile) && !justCheckPage) {
         await page.close();
         if (!cli_args.dev) {
             // should send errors to another queue or anywhere else
-            await rbmqc.publish(rabbitmq_config.queues.sandbox_iocs_queue.name, `error analysing sample: ${err}`)
+            await rbmqc.publish(rabbitmq_config.queues.sandbox_iocs_queue.name, {
+                file_hash: fileHash,
+                analysis_id: analysisId,
+                iocs: [],
+                error: `${err}`
+            })
             await rbmqc.close();
         }
         process.exit(1)
