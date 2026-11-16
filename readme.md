@@ -86,9 +86,9 @@ Finally everything is running. Now you can submit files to the application api a
 
     ```bash
     curl --location 'http://127.0.0.1:11234/analyse-file' \
-    --form 'file_for_analysis=@"/file/for/analysis/local-path/file.js"' \
-    --form 'bait_websites="https://facebook.com,https://google.com,https://cnn.com"' \
-    --form 'dynamic_analysis="true"'
+      --form 'file_for_analysis=@"/file/for/analysis/local-path/file.js"' \
+      --form 'bait_websites="https://facebook.com,https://google.com,https://cnn.com"' \
+      --form 'dynamic_analysis="true"'
     ```
 
     response:
@@ -107,7 +107,7 @@ Finally everything is running. Now you can submit files to the application api a
 
     ```bash
     curl --location 'http://127.0.0.1:11234/analyse-file' \
-    --form 'page_for_analysis="https://malicious.com"'
+      --form 'page_for_analysis="https://malicious.com"'
     ```
 
     response:

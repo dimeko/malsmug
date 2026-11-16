@@ -154,7 +154,7 @@ impl RabbitMQ {
         let _ = self.channel.queue_bind(
             &self.conf.sandbox_iocs_queue.name,
             &self.conf.main_exchange.name,
-            &self.conf.core_files_queue.name,
+            &self.conf.sandbox_iocs_queue.name,
             queue_bind_args, FieldTable::default()).await;
     }
 }

@@ -425,6 +425,11 @@ impl AppMethods for App {
                                             }
                                         };
 
+                                        if let Some(err) = &events_for_analysis.error {
+                                            error!("sandbox failed for analysis {}: {}", events_for_analysis.analysis_id, err);
+                                            continue;
+                                        }
+
                                         // get file report stored in database on file upload
                                         let file_reports_with_the_same_hash = match inner_store.db
                                             .file_analysis_report

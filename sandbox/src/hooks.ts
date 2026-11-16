@@ -1,3 +1,4 @@
+import { analysis_info } from "./logger";
 import * as types from "./types";
 
 // place_hooks is serialized and runs inside the browser, so it cannot use values
@@ -16,7 +17,6 @@ function place_hooks(reportFnName: string) {
         "object": "src",
         "embed": "src"
     };
-
     // accessing localStorage throws on opaque origins (e.g. sandboxed iframes),
     // this should not prevent the rest of the hooks from being placed
     try {
@@ -111,6 +111,8 @@ function place_hooks(reportFnName: string) {
 
         const originalFetch = window.fetch;
         window.fetch = function (...args) {
+            console.log("request: ", args)
+
             let _event: types.IoC = {
                 ioc_type: types.IoCType.HttpRequest,
                 timestamp: Date.now(),
@@ -128,6 +130,7 @@ function place_hooks(reportFnName: string) {
 
         const originalWindowOpen = window.open;
         window.open = function (...args) {
+            console.log("request: ", args)
             let _event: types.IoC = {
                 ioc_type: types.IoCType.HttpRequest,
                 timestamp: Date.now(),
@@ -146,6 +149,7 @@ function place_hooks(reportFnName: string) {
 
         const originalXHROpen = window.XMLHttpRequest.prototype.open;
         window.XMLHttpRequest.prototype.open = function(...args: any) {
+            console.log("request: ", args)
             let _event: types.IoC = {
                 ioc_type: types.IoCType.HttpRequest,
                 timestamp: Date.now(),
@@ -166,6 +170,7 @@ function place_hooks(reportFnName: string) {
         const originalXHRSend = window.XMLHttpRequest.prototype.send;
         window.XMLHttpRequest.prototype.send = function(...args: any) {
             try {
+                console.log("request: ", args)
 
                 let _event: types.IoC = {
                     ioc_type: types.IoCType.HttpRequest,

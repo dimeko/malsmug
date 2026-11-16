@@ -19,7 +19,7 @@ function init_logger(dev: boolean) {
     if (dev) {
         log.configure({
             appenders: { err: { type: 'stderr' } },
-            categories: { default: { appenders: ['err'], level: 'info' } }
+            categories: { default: { appenders: ['err'], level: 'debug' } }
         })
     }
     const log_level = process.env.LOG_LEVEL;

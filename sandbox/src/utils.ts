@@ -1,4 +1,5 @@
 import * as types from "./types";
+import { init_logger, analysis_debug, analysis_info, analysis_warn, analysis_error, dom_console } from "./logger";
 
 // JSON.stringify replacer that keeps downloaded files out of a printed report
 function elide_byte_arrays(key: string, value: any): any {
@@ -25,12 +26,12 @@ function as_text_list(value: unknown): string[] {
 // Returns null for anything that is not an ioc
 function sanitize_ioc(reported: unknown): types.IoC | null {
     if (typeof reported !== "object" || reported === null) return null
-
-    const { type, timestamp, value: reported_value } = reported as any
+    
+    const { ioc_type, timestamp, value: reported_value } = reported as any
     const value = reported_value ?? {}
     let sanitized_value: types.IoC["value"]
 
-    switch (type) {
+    switch (ioc_type) {
         case types.IoCType.HttpRequest:
             sanitized_value = { method: as_text(value.method), url: as_text(value.url), data: as_text(value.data) }
             break;
@@ -58,7 +59,7 @@ function sanitize_ioc(reported: unknown): types.IoC | null {
     }
 
     return {
-        ioc_type: type,
+        ioc_type: ioc_type,
         executed_on: "",
         timestamp: Number.isSafeInteger(timestamp) && timestamp >= 0 ? timestamp : Date.now(),
         value: sanitized_value
