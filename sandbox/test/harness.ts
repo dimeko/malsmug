@@ -133,8 +133,9 @@ function matches_rust_types(type: types.IoCType, value: any): boolean {
         case types.IoCType.NewNetworkHtmlElement:
             return is_str(value.elementType) && is_str(value.src);
         case types.IoCType.SetCookie:
+            return is_str(value.set_cookie);
         case types.IoCType.GetCookie:
-            return is_str(value.cookie);
+            return is_str(value.got_cookie);
         case types.IoCType.AddEventListener:
             return is_str(value.listener);
         default:
